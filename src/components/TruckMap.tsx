@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import type { TruckStop } from "@/lib/data";
-import { formatTimeRange } from "@/lib/geo";
+import { formatTimeRange, isNowWithin } from "@/lib/geo";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
 
@@ -15,6 +15,7 @@ interface TruckMapProps {
   userLocation: [number, number] | null;
   selectedTruckId: string | null;
   onSelectTruck: (truckId: string | null) => void;
+  now?: Date;
 }
 
 export default function TruckMap({
@@ -22,6 +23,7 @@ export default function TruckMap({
   userLocation,
   selectedTruckId,
   onSelectTruck,
+  now = new Date(),
 }: TruckMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -92,14 +94,20 @@ export default function TruckMap({
 
     stops.forEach(({ truck, schedule }) => {
       const lngLat: [number, number] = [schedule.location_lng, schedule.location_lat];
+      const open = isNowWithin(schedule.start_time, schedule.end_time, now);
 
       const popupHtml = `
-        <div style="font-family: system-ui, sans-serif; min-width: 220px;">
+        <div style="font-family: 'Inter', system-ui, sans-serif; min-width: 220px;">
           <div style="padding: 12px 14px 10px;">
-            <div style="font-weight: 700; font-size: 15px; color: #111;">${escapeHtml(
-              truck.name
-            )}</div>
-            <div style="font-size: 13px; color: #666; margin-top: 2px;">${escapeHtml(
+            <div style="display:flex; align-items:center; gap:6px;">
+              <span style="font-weight: 700; font-size: 15px; color: #111;">${escapeHtml(
+                truck.name
+              )}</span>
+              <span style="font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; color: white; background: ${
+                open ? "#22c55e" : "#171717"
+              };">${open ? "OPEN" : "CLOSED"}</span>
+            </div>
+            <div style="font-size: 13px; color: #666; margin-top: 3px;">${escapeHtml(
               truck.cuisine_type.join(", ")
             )}</div>
             <div style="font-size: 13px; color: #333; margin-top: 8px; display:flex; align-items:center; gap:4px;">
@@ -121,15 +129,21 @@ export default function TruckMap({
         const el = document.createElement("button");
         el.setAttribute("aria-label", `${truck.name} location`);
         el.style.cssText = `
-          width: 40px; height: 40px; border-radius: 50%;
-          background: #FF6A00; border: 3px solid white;
-          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+          width: 40px; height: 40px; border-radius: 50% 50% 50% 4px;
+          transform: rotate(45deg);
+          background: ${open ? "#FF6A00" : "#A3A3A3"};
+          border: 3px solid white;
+          box-shadow: 0 3px 8px rgba(0,0,0,0.35);
           display: flex; align-items: center; justify-content: center;
-          font-size: 18px; cursor: pointer; padding: 0;
+          cursor: pointer; padding: 0;
         `;
-        el.textContent = "🚚";
+        const inner = document.createElement("span");
+        inner.textContent = "🚚";
+        inner.style.cssText = "display:block; transform: rotate(-45deg); font-size: 17px;";
+        el.appendChild(inner);
+        if (open) el.classList.add("pulse-ring");
 
-        const popup = new mapboxgl.Popup({ offset: 24, closeButton: true }).setHTML(popupHtml);
+        const popup = new mapboxgl.Popup({ offset: 28, closeButton: true }).setHTML(popupHtml);
         popupsRef.current.set(truck.id, popup);
 
         marker = new mapboxgl.Marker({ element: el })
@@ -142,10 +156,14 @@ export default function TruckMap({
         markersRef.current.set(truck.id, marker);
       } else {
         marker.setLngLat(lngLat);
+        marker.getPopup()?.setHTML(popupHtml);
+        const el = marker.getElement();
+        el.style.background = open ? "#FF6A00" : "#A3A3A3";
+        el.classList.toggle("pulse-ring", open);
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stops]);
+  }, [stops, now]);
 
   // React to external selection (e.g. clicking a list item)
   useEffect(() => {

@@ -2,9 +2,13 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { ArrowLeft, Globe, Music2, Navigation } from "lucide-react";
+import InstagramIcon from "@/components/icons/InstagramIcon";
 import { getTruckBySlug, getTruckPhotos, getTruckSchedule } from "@/lib/data";
 import { DAY_LABELS, DAY_LABELS_SHORT } from "@/lib/types";
-import { formatTimeRange, getMondayFirstDay } from "@/lib/geo";
+import { formatTimeRange, getMondayFirstDay, isNowWithin } from "@/lib/geo";
+import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
+import FavoriteButton from "@/components/FavoriteButton";
 
 export const revalidate = 300;
 
@@ -48,14 +52,30 @@ export default async function TruckProfilePage({ params }: PageProps) {
   const truck = await getTruckBySlug(params.slug);
   if (!truck) notFound();
 
-  const [schedule, photos] = await Promise.all([
+  const [schedule, photos, auth] = await Promise.all([
     getTruckSchedule(truck.id),
     getTruckPhotos(truck.id),
+    getCurrentUserProfile(),
   ]);
+
+  const supabase = createClient();
+  void supabase.from("truck_page_views").insert({ truck_id: truck.id });
+
+  let isFavorited = false;
+  if (auth) {
+    const { data } = await supabase
+      .from("user_favorites")
+      .select("truck_id")
+      .eq("user_id", auth.user.id)
+      .eq("truck_id", truck.id)
+      .maybeSingle();
+    isFavorited = Boolean(data);
+  }
 
   const today = getMondayFirstDay();
   const todaySchedule = schedule.filter((s) => s.day_of_week === today);
   const nextStop = todaySchedule[0] ?? schedule[0];
+  const openNow = todaySchedule.some((s) => isNowWithin(s.start_time, s.end_time));
 
   const directionsUrl = nextStop
     ? `https://www.google.com/maps/dir/?api=1&destination=${nextStop.location_lat},${nextStop.location_lng}`
@@ -92,14 +112,14 @@ export default async function TruckProfilePage({ params }: PageProps) {
   };
 
   return (
-    <div className="min-h-dvh bg-white pb-12">
+    <div className="min-h-dvh bg-white pb-16">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      <div className="relative h-56 w-full bg-neutral-200 sm:h-72">
-        {truck.cover_photo_url && (
+      <div className="relative h-64 w-full bg-neutral-200 sm:h-80">
+        {truck.cover_photo_url ? (
           <Image
             src={truck.cover_photo_url}
             alt={`${truck.name} cover photo`}
@@ -107,28 +127,50 @@ export default async function TruckProfilePage({ params }: PageProps) {
             priority
             className="object-cover"
           />
+        ) : (
+          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-neutral-800 to-neutral-950 text-6xl">
+            🚚
+          </div>
         )}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/0 to-black/10" />
+
         <Link
           href="/"
-          className="absolute left-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-white/90 text-lg shadow"
+          className="absolute left-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/90 shadow backdrop-blur-sm transition hover:bg-white"
           aria-label="Back to map"
         >
-          ←
+          <ArrowLeft className="h-5 w-5 text-neutral-800" />
         </Link>
+
+        <div className="absolute right-4 top-4">
+          <FavoriteButton truckId={truck.id} initialFavorited={isFavorited} signedIn={Boolean(auth)} />
+        </div>
       </div>
 
       <div className="relative px-4">
-        <div className="absolute -top-10 h-20 w-20 overflow-hidden rounded-2xl border-4 border-white bg-neutral-100 shadow-md">
+        <div className="absolute -top-12 h-24 w-24 overflow-hidden rounded-2xl border-4 border-white bg-neutral-100 shadow-lg">
           {truck.logo_url ? (
             <Image src={truck.logo_url} alt={`${truck.name} logo`} fill className="object-cover" />
           ) : (
-            <div className="flex h-full w-full items-center justify-center text-3xl">🚚</div>
+            <div className="flex h-full w-full items-center justify-center text-4xl">🚚</div>
           )}
         </div>
 
-        <div className="pt-12">
-          <h1 className="text-2xl font-bold text-neutral-900">{truck.name}</h1>
-          <div className="mt-1 flex flex-wrap items-center gap-2">
+        <div className="pt-16">
+          <div className="flex items-start justify-between gap-3">
+            <h1 className="text-2xl font-extrabold tracking-tight text-neutral-900 sm:text-3xl">
+              {truck.name}
+            </h1>
+            <span
+              className={`mt-1 flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
+                openNow ? "bg-green-100 text-green-700" : "bg-neutral-100 text-neutral-500"
+              }`}
+            >
+              {openNow ? "Open now" : "Closed"}
+            </span>
+          </div>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
             {truck.cuisine_type.map((c) => (
               <span
                 key={c}
@@ -152,9 +194,10 @@ export default async function TruckProfilePage({ params }: PageProps) {
                 href={directionsUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 rounded-xl bg-brand py-3 text-center text-sm font-bold text-white shadow-sm active:bg-brand-600"
+                className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-brand py-3 text-center text-sm font-bold text-white shadow-sm shadow-brand/30 transition hover:brightness-105 active:scale-[0.99]"
               >
-                🧭 Get directions
+                <Navigation className="h-4 w-4" />
+                Get directions
               </a>
             )}
             {truck.instagram && (
@@ -166,10 +209,10 @@ export default async function TruckProfilePage({ params }: PageProps) {
                 }
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex h-12 w-12 items-center justify-center rounded-xl border border-neutral-200 text-lg"
+                className="flex h-12 w-12 items-center justify-center rounded-xl border border-neutral-200 text-neutral-700 transition hover:border-brand hover:text-brand"
                 aria-label="Instagram"
               >
-                📷
+                <InstagramIcon className="h-5 w-5" />
               </a>
             )}
             {truck.tiktok && (
@@ -181,10 +224,10 @@ export default async function TruckProfilePage({ params }: PageProps) {
                 }
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex h-12 w-12 items-center justify-center rounded-xl border border-neutral-200 text-lg"
+                className="flex h-12 w-12 items-center justify-center rounded-xl border border-neutral-200 text-neutral-700 transition hover:border-brand hover:text-brand"
                 aria-label="TikTok"
               >
-                🎵
+                <Music2 className="h-5 w-5" />
               </a>
             )}
             {truck.website && (
@@ -192,43 +235,43 @@ export default async function TruckProfilePage({ params }: PageProps) {
                 href={truck.website.startsWith("http") ? truck.website : `https://${truck.website}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex h-12 w-12 items-center justify-center rounded-xl border border-neutral-200 text-lg"
+                className="flex h-12 w-12 items-center justify-center rounded-xl border border-neutral-200 text-neutral-700 transition hover:border-brand hover:text-brand"
                 aria-label="Website"
               >
-                🌐
+                <Globe className="h-5 w-5" />
               </a>
             )}
           </div>
 
-          <section className="mt-8">
+          <section className="mt-9">
             <h2 className="text-lg font-bold text-neutral-900">Weekly schedule</h2>
-            <div className="mt-3 divide-y divide-neutral-100 rounded-xl border border-neutral-100">
+            <div className="mt-3 overflow-hidden rounded-2xl border border-neutral-100 shadow-card">
               {DAY_LABELS_SHORT.map((label, idx) => {
                 const entries = schedule.filter((s) => s.day_of_week === idx);
                 const isToday = idx === today;
                 return (
                   <div
                     key={idx}
-                    className={`flex items-start justify-between gap-3 px-4 py-3 ${
-                      isToday ? "bg-brand-50" : ""
+                    className={`grid grid-cols-[3.5rem_1fr] gap-3 border-b border-neutral-100 px-4 py-3 last:border-b-0 ${
+                      isToday ? "bg-brand-50/70" : ""
                     }`}
                   >
                     <span
-                      className={`w-12 flex-shrink-0 text-sm font-semibold ${
-                        isToday ? "text-brand" : "text-neutral-500"
-                      }`}
+                      className={`text-sm font-bold ${isToday ? "text-brand" : "text-neutral-400"}`}
                     >
                       {label}
                     </span>
                     {entries.length === 0 ? (
-                      <span className="flex-1 text-sm text-neutral-400">Not operating</span>
+                      <span className="text-sm text-neutral-300">—</span>
                     ) : (
-                      <div className="flex-1 space-y-1 text-right">
+                      <div className="space-y-1">
                         {entries.map((e) => (
                           <div key={e.id} className="text-sm text-neutral-700">
-                            <span className="font-medium">{e.location_name}</span>
-                            <span className="text-neutral-400"> · </span>
-                            <span>{formatTimeRange(e.start_time, e.end_time)}</span>
+                            <span className="font-semibold">{e.location_name}</span>
+                            <span className="text-neutral-300"> · </span>
+                            <span className="text-neutral-500">
+                              {formatTimeRange(e.start_time, e.end_time)}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -240,7 +283,7 @@ export default async function TruckProfilePage({ params }: PageProps) {
           </section>
 
           {(truck.menu_text || truck.menu_photo_url) && (
-            <section className="mt-8">
+            <section className="mt-9">
               <h2 className="text-lg font-bold text-neutral-900">Menu</h2>
               {truck.menu_text && (
                 <p className="mt-3 whitespace-pre-line text-[15px] leading-relaxed text-neutral-700">
@@ -248,7 +291,7 @@ export default async function TruckProfilePage({ params }: PageProps) {
                 </p>
               )}
               {truck.menu_photo_url && (
-                <div className="relative mt-4 h-96 w-full overflow-hidden rounded-xl bg-neutral-100">
+                <div className="relative mt-4 h-96 w-full overflow-hidden rounded-2xl bg-neutral-100">
                   <Image
                     src={truck.menu_photo_url}
                     alt={`${truck.name} menu`}
@@ -261,13 +304,13 @@ export default async function TruckProfilePage({ params }: PageProps) {
           )}
 
           {photos.length > 0 && (
-            <section className="mt-8">
+            <section className="mt-9">
               <h2 className="text-lg font-bold text-neutral-900">Gallery</h2>
-              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+              <div className="no-scrollbar mt-3 flex gap-2.5 overflow-x-auto pb-1">
                 {photos.map((photo) => (
                   <div
                     key={photo.id}
-                    className="relative aspect-square overflow-hidden rounded-xl bg-neutral-100"
+                    className="relative aspect-square h-40 w-40 flex-shrink-0 overflow-hidden rounded-2xl bg-neutral-100 sm:h-48 sm:w-48"
                   >
                     <Image
                       src={photo.url}

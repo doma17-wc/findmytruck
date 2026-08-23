@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import { Search } from "lucide-react";
 import type { TruckStop } from "@/lib/data";
 import { distanceKm, isNowWithin } from "@/lib/geo";
 import TruckListItem from "./TruckListItem";
@@ -19,13 +20,18 @@ const ZURICH_CENTER: [number, number] = [8.5417, 47.3769];
 
 interface HomeClientProps {
   initialStops: TruckStop[];
+  signedIn: boolean;
+  favoritedIds: string[];
 }
 
-export default function HomeClient({ initialStops }: HomeClientProps) {
+export default function HomeClient({ initialStops, signedIn, favoritedIds }: HomeClientProps) {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
   const [selectedTruckId, setSelectedTruckId] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
+  const [query, setQuery] = useState("");
+
+  const favoritedSet = useMemo(() => new Set(favoritedIds), [favoritedIds]);
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 60_000);
@@ -44,15 +50,24 @@ export default function HomeClient({ initialStops }: HomeClientProps) {
     );
   }, []);
 
-  const openStops = useMemo(
-    () => initialStops.filter((s) => isNowWithin(s.schedule.start_time, s.schedule.end_time, now)),
-    [initialStops, now]
-  );
+  const filteredStops = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return initialStops;
+    return initialStops.filter(
+      (s) =>
+        s.truck.name.toLowerCase().includes(q) ||
+        s.truck.cuisine_type.some((c) => c.toLowerCase().includes(q))
+    );
+  }, [initialStops, query]);
 
   const referencePoint = userLocation ?? ZURICH_CENTER;
 
   const sortedStops = useMemo(() => {
-    return [...openStops].sort((a, b) => {
+    return [...filteredStops].sort((a, b) => {
+      const aOpen = isNowWithin(a.schedule.start_time, a.schedule.end_time, now);
+      const bOpen = isNowWithin(b.schedule.start_time, b.schedule.end_time, now);
+      if (aOpen !== bOpen) return aOpen ? -1 : 1;
+
       const da = distanceKm(
         referencePoint[1],
         referencePoint[0],
@@ -67,56 +82,65 @@ export default function HomeClient({ initialStops }: HomeClientProps) {
       );
       return da - db;
     });
-  }, [openStops, referencePoint]);
+  }, [filteredStops, referencePoint, now]);
+
+  const openCount = sortedStops.filter((s) =>
+    isNowWithin(s.schedule.start_time, s.schedule.end_time, now)
+  ).length;
 
   return (
-    <div className="flex h-dvh w-full flex-col">
-      <header className="flex items-center justify-between border-b border-neutral-100 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="text-xl">🚚</span>
-          <span className="text-lg font-bold text-neutral-900">
-            Find<span className="text-brand">My</span>Truck
-          </span>
-        </div>
-        <a
-          href="/zurich"
-          className="rounded-full px-3 py-1.5 text-sm font-medium text-neutral-600 active:bg-neutral-100"
-        >
-          Zurich
-        </a>
-      </header>
-
-      <div className="relative h-[55vh] w-full flex-shrink-0 sm:h-[65vh]">
+    <div className="flex flex-col">
+      <div className="relative h-[62vh] w-full sm:h-[68vh]">
         <TruckMap
           stops={sortedStops}
           userLocation={userLocation}
           selectedTruckId={selectedTruckId}
           onSelectTruck={setSelectedTruckId}
+          now={now}
         />
+
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center px-4 pt-4">
+          <div className="pointer-events-auto flex w-full max-w-md items-center gap-2 rounded-2xl border border-white/40 bg-white/75 px-4 py-3 shadow-lg backdrop-blur-md transition focus-within:bg-white/90">
+            <Search className="h-4 w-4 flex-shrink-0 text-neutral-500" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search trucks or cuisines…"
+              className="w-full bg-transparent text-[15px] text-neutral-900 placeholder:text-neutral-500 focus:outline-none"
+            />
+          </div>
+        </div>
+
         {locationDenied && (
-          <div className="absolute left-1/2 top-3 -translate-x-1/2 rounded-full bg-white/95 px-3 py-1.5 text-xs font-medium text-neutral-600 shadow">
+          <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-full bg-white/95 px-3 py-1.5 text-xs font-medium text-neutral-600 shadow">
             Showing Zurich · enable location for distances
           </div>
         )}
       </div>
 
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3">
-          <h2 className="text-base font-bold text-neutral-900">
-            Open now {sortedStops.length > 0 && `(${sortedStops.length})`}
+      <div className="mx-auto w-full max-w-6xl px-4 py-5">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-extrabold text-neutral-900">
+            Today&apos;s trucks {sortedStops.length > 0 && `(${sortedStops.length})`}
           </h2>
+          {sortedStops.length > 0 && (
+            <span className="text-sm font-semibold text-green-600">{openCount} open now</span>
+          )}
         </div>
 
-        <div className="flex-1 overflow-y-auto pb-4">
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {sortedStops.length === 0 ? (
-            <p className="px-4 py-8 text-center text-sm text-neutral-500">
-              No trucks are open right now. Check back during lunch hours!
+            <p className="col-span-full py-10 text-center text-sm text-neutral-500">
+              No trucks match &quot;{query}&quot; right now.
             </p>
           ) : (
             sortedStops.map((stop) => (
               <TruckListItem
                 key={stop.schedule.id}
                 stop={stop}
+                isOpen={isNowWithin(stop.schedule.start_time, stop.schedule.end_time, now)}
+                signedIn={signedIn}
+                isFavorited={favoritedSet.has(stop.truck.id)}
                 distanceKm={
                   userLocation
                     ? distanceKm(

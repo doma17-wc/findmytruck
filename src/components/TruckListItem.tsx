@@ -4,51 +4,98 @@ import Image from "next/image";
 import Link from "next/link";
 import type { TruckStop } from "@/lib/data";
 import { formatDistance, formatTimeRange } from "@/lib/geo";
+import FavoriteButton from "@/components/FavoriteButton";
 
 interface TruckListItemProps {
   stop: TruckStop;
   distanceKm: number | null;
+  isOpen: boolean;
+  signedIn: boolean;
+  isFavorited: boolean;
   onSelect: () => void;
 }
 
-export default function TruckListItem({ stop, distanceKm, onSelect }: TruckListItemProps) {
+export default function TruckListItem({
+  stop,
+  distanceKm,
+  isOpen,
+  signedIn,
+  isFavorited,
+  onSelect,
+}: TruckListItemProps) {
   const { truck, schedule } = stop;
+  const image = truck.cover_photo_url ?? truck.logo_url;
 
   return (
     <button
       onClick={onSelect}
-      className="flex w-full items-center gap-3 border-b border-neutral-100 p-4 text-left last:border-b-0 active:bg-neutral-50"
+      className="group relative w-full overflow-hidden rounded-2xl border border-neutral-100 bg-white text-left shadow-card transition hover:-translate-y-0.5 hover:shadow-card-hover active:translate-y-0"
     >
-      <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-neutral-100">
-        {truck.logo_url ? (
-          <Image src={truck.logo_url} alt={truck.name} fill className="object-cover" />
+      <div className="relative h-32 w-full bg-neutral-100">
+        {image ? (
+          <Image
+            src={image}
+            alt={truck.name}
+            fill
+            className="object-cover transition duration-300 group-hover:scale-105"
+            sizes="(max-width: 640px) 100vw, 320px"
+          />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-2xl">🚚</div>
+          <div className="flex h-full w-full items-center justify-center text-4xl">🚚</div>
+        )}
+
+        <div className="absolute left-3 top-3">
+          <span
+            className={`rounded-full px-2.5 py-1 text-xs font-bold shadow-sm ${
+              isOpen ? "bg-green-500 text-white" : "bg-neutral-900/80 text-white"
+            }`}
+          >
+            {isOpen ? "Open now" : "Closed"}
+          </span>
+        </div>
+
+        <div className="absolute right-3 top-3">
+          <FavoriteButton
+            truckId={truck.id}
+            initialFavorited={isFavorited}
+            signedIn={signedIn}
+            size="sm"
+          />
+        </div>
+
+        {distanceKm !== null && (
+          <span className="absolute bottom-3 right-3 rounded-full bg-white/95 px-2.5 py-1 text-xs font-bold text-neutral-800 shadow-sm">
+            {formatDistance(distanceKm)}
+          </span>
         )}
       </div>
 
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="truncate text-base font-semibold text-neutral-900">{truck.name}</h3>
-          {distanceKm !== null && (
-            <span className="flex-shrink-0 text-sm font-medium text-brand">
-              {formatDistance(distanceKm)}
+      <div className="p-4">
+        <h3 className="truncate text-base font-bold text-neutral-900">{truck.name}</h3>
+
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          {truck.cuisine_type.slice(0, 3).map((c) => (
+            <span
+              key={c}
+              className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand"
+            >
+              {c}
             </span>
-          )}
+          ))}
         </div>
-        <p className="truncate text-sm text-neutral-500">{truck.cuisine_type.join(", ")}</p>
-        <p className="mt-1 truncate text-sm text-neutral-700">
+
+        <p className="mt-2.5 truncate text-sm text-neutral-500">
           📍 {schedule.location_name} · {formatTimeRange(schedule.start_time, schedule.end_time)}
         </p>
-      </div>
 
-      <Link
-        href={`/trucks/${truck.slug}`}
-        onClick={(e) => e.stopPropagation()}
-        className="flex-shrink-0 rounded-full bg-brand-50 px-3 py-2 text-sm font-semibold text-brand active:bg-brand-100"
-      >
-        View
-      </Link>
+        <Link
+          href={`/trucks/${truck.slug}`}
+          onClick={(e) => e.stopPropagation()}
+          className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-neutral-900 py-2.5 text-sm font-bold text-white transition group-hover:bg-brand"
+        >
+          View profile
+        </Link>
+      </div>
     </button>
   );
 }

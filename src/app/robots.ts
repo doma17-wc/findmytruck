@@ -6,7 +6,7 @@ export default function robots(): MetadataRoute.Robots {
       {
         userAgent: "*",
         allow: "/",
-        disallow: "/admin",
+        disallow: ["/admin", "/dashboard", "/account", "/favorites"],
       },
     ],
     sitemap: "https://findmytruck.ch/sitemap.xml",
