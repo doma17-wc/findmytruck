@@ -1,11 +1,11 @@
 import HomeClient from "@/components/HomeClient";
-import { getTodaysTruckStops } from "@/lib/data";
+import { getAllTrucksWithSchedules } from "@/lib/data";
 import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
 
 export const revalidate = 60;
 
 export default async function HomePage() {
-  const [stops, auth] = await Promise.all([getTodaysTruckStops(), getCurrentUserProfile()]);
+  const [trucks, auth] = await Promise.all([getAllTrucksWithSchedules(), getCurrentUserProfile()]);
 
   let favoritedIds: string[] = [];
   if (auth) {
@@ -14,5 +14,5 @@ export default async function HomePage() {
     favoritedIds = (data ?? []).map((r) => r.truck_id as string);
   }
 
-  return <HomeClient initialStops={stops} signedIn={Boolean(auth)} favoritedIds={favoritedIds} />;
+  return <HomeClient initialTrucks={trucks} signedIn={Boolean(auth)} favoritedIds={favoritedIds} />;
 }

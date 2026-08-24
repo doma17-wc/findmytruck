@@ -1,8 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import type { Truck } from "@/lib/types";
 import { saveOwnTruckAction, type DashboardFormState } from "@/app/(site)/dashboard/actions";
+import ChipSelect from "./ChipSelect";
+import {
+  CUISINE_OPTIONS,
+  PRICE_RANGE_OPTIONS,
+  FOOD_TYPE_OPTIONS,
+  DIETARY_OPTIONS,
+  LANGUAGE_OPTIONS,
+  PAYMENT_METHOD_OPTIONS,
+  FEATURE_OPTIONS,
+} from "@/lib/truckOptions";
 
 function SubmitButton() {
   const { pending } = useFormStatus();
@@ -26,11 +37,45 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
+function ChipField({
+  label,
+  name,
+  options,
+  selected,
+  onToggle,
+}: {
+  label: string;
+  name: string;
+  options: string[];
+  selected: string[];
+  onToggle: (option: string) => void;
+}) {
+  return (
+    <div>
+      <span className="mb-1.5 block text-sm font-medium text-neutral-700">{label}</span>
+      <ChipSelect options={options} selected={selected} onToggle={onToggle} />
+      <input type="hidden" name={name} value={selected.join(",")} />
+    </div>
+  );
+}
+
+function toggleValue(list: string[], value: string): string[] {
+  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+}
+
 const inputClass =
   "w-full rounded-xl border border-neutral-200 px-3.5 py-2.5 text-[15px] transition focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20";
 
 export default function DashboardTruckForm({ truck }: { truck: Truck }) {
   const [state, formAction] = useFormState<DashboardFormState, FormData>(saveOwnTruckAction, {});
+
+  const [cuisineType, setCuisineType] = useState<string[]>(truck.cuisine_type ?? []);
+  const [priceRange, setPriceRange] = useState<string>(truck.price_range ?? "");
+  const [foodType, setFoodType] = useState<string[]>(truck.food_type ?? []);
+  const [dietaryOptions, setDietaryOptions] = useState<string[]>(truck.dietary_options ?? []);
+  const [languages, setLanguages] = useState<string[]>(truck.languages ?? []);
+  const [paymentMethods, setPaymentMethods] = useState<string[]>(truck.payment_methods ?? []);
+  const [features, setFeatures] = useState<string[]>(truck.features ?? []);
 
   return (
     <form action={formAction} className="space-y-4">
@@ -58,33 +103,78 @@ export default function DashboardTruckForm({ truck }: { truck: Truck }) {
         />
       </Field>
 
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Cuisine (comma-separated)">
-          <input
-            name="cuisine_type"
-            defaultValue={truck.cuisine_type?.join(", ")}
-            className={inputClass}
-            placeholder="Burgers, American"
-          />
-        </Field>
-        <Field label="Price range">
-          <input
-            name="price_range"
-            defaultValue={truck.price_range ?? ""}
-            className={inputClass}
-            placeholder="$$"
-          />
-        </Field>
+      <ChipField
+        label="Cuisine type"
+        name="cuisine_type"
+        options={CUISINE_OPTIONS}
+        selected={cuisineType}
+        onToggle={(opt) => setCuisineType((prev) => toggleValue(prev, opt))}
+      />
+
+      <div>
+        <span className="mb-1.5 block text-sm font-medium text-neutral-700">Price range</span>
+        <div className="flex flex-wrap gap-2">
+          {PRICE_RANGE_OPTIONS.map(({ value, label }) => {
+            const active = priceRange === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => setPriceRange(value)}
+                className={`rounded-full border px-3 py-1.5 text-sm font-semibold transition ${
+                  active
+                    ? "border-brand bg-brand text-white"
+                    : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300 hover:bg-neutral-50"
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+        <input type="hidden" name="price_range" value={priceRange} />
       </div>
 
-      <Field label="Languages (comma-separated)">
-        <input
-          name="languages"
-          defaultValue={truck.languages?.join(", ")}
-          className={inputClass}
-          placeholder="de, en"
-        />
-      </Field>
+      <ChipField
+        label="Food type"
+        name="food_type"
+        options={FOOD_TYPE_OPTIONS}
+        selected={foodType}
+        onToggle={(opt) => setFoodType((prev) => toggleValue(prev, opt))}
+      />
+
+      <ChipField
+        label="Dietary options"
+        name="dietary_options"
+        options={DIETARY_OPTIONS}
+        selected={dietaryOptions}
+        onToggle={(opt) => setDietaryOptions((prev) => toggleValue(prev, opt))}
+      />
+
+      <ChipField
+        label="Languages spoken"
+        name="languages"
+        options={LANGUAGE_OPTIONS}
+        selected={languages}
+        onToggle={(opt) => setLanguages((prev) => toggleValue(prev, opt))}
+      />
+
+      <ChipField
+        label="Payment methods"
+        name="payment_methods"
+        options={PAYMENT_METHOD_OPTIONS}
+        selected={paymentMethods}
+        onToggle={(opt) => setPaymentMethods((prev) => toggleValue(prev, opt))}
+      />
+
+      <ChipField
+        label="Truck features"
+        name="features"
+        options={FEATURE_OPTIONS}
+        selected={features}
+        onToggle={(opt) => setFeatures((prev) => toggleValue(prev, opt))}
+      />
 
       <div className="grid grid-cols-2 gap-3">
         <Field label="Logo URL">

@@ -1,3 +1,6 @@
+import type { TruckSchedule } from "./types";
+import { DAY_LABELS } from "./types";
+
 /** Great-circle distance between two lat/lng points, in kilometers. */
 export function distanceKm(
   lat1: number,
@@ -43,4 +46,68 @@ export function isNowWithin(startTime: string, endTime: string, now: Date = new 
 
 export function formatTimeRange(start: string, end: string): string {
   return `${start.slice(0, 5)} – ${end.slice(0, 5)}`;
+}
+
+export type TruckStatusState = "open" | "opens_today" | "next_day" | "none";
+
+export interface TruckStatus {
+  state: TruckStatusState;
+  label: string;
+  /** The schedule entry to use for the map pin / location display. */
+  schedule: TruckSchedule | null;
+}
+
+/**
+ * Status is always computed from the FULL set of a truck's schedule entries
+ * (not just today's), so a truck scheduled on other days still gets a pin
+ * and a "Next: ..." label instead of disappearing from the map entirely.
+ */
+export function computeTruckStatus(
+  schedules: TruckSchedule[],
+  now: Date = new Date()
+): TruckStatus {
+  if (schedules.length === 0) return { state: "none", label: "No schedule set", schedule: null };
+
+  const todayIdx = getMondayFirstDay(now);
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const today = schedules.filter((s) => s.day_of_week === todayIdx);
+
+  const openNow = today.find((s) => isNowWithin(s.start_time, s.end_time, now));
+  if (openNow) return { state: "open", label: "OPEN NOW", schedule: openNow };
+
+  const upcomingToday = today
+    .filter((s) => timeToMinutes(s.start_time) > nowMinutes)
+    .sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time))[0];
+
+  if (upcomingToday) {
+    const diff = timeToMinutes(upcomingToday.start_time) - nowMinutes;
+    const label =
+      diff <= 180
+        ? diff < 60
+          ? `Opens in ${diff}m`
+          : `Opens in ${Math.round(diff / 60)}h`
+        : `Opens at ${upcomingToday.start_time.slice(0, 5)}`;
+    return { state: "opens_today", label, schedule: upcomingToday };
+  }
+
+  // No slot left today (or none today at all) — find the next upcoming day.
+  let best: { schedule: TruckSchedule; daysAhead: number } | null = null;
+  for (const s of schedules) {
+    let daysAhead = (s.day_of_week - todayIdx + 7) % 7;
+    if (daysAhead === 0) daysAhead = 7; // today's slots already ended
+    if (
+      !best ||
+      daysAhead < best.daysAhead ||
+      (daysAhead === best.daysAhead && timeToMinutes(s.start_time) < timeToMinutes(best.schedule.start_time))
+    ) {
+      best = { schedule: s, daysAhead };
+    }
+  }
+
+  if (!best) return { state: "none", label: "No schedule set", schedule: null };
+  return {
+    state: "next_day",
+    label: `Next: ${DAY_LABELS[best.schedule.day_of_week]} ${best.schedule.start_time.slice(0, 5)}`,
+    schedule: best.schedule,
+  };
 }

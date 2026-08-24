@@ -13,6 +13,10 @@ export interface PublicTruck {
   tiktok: string | null;
   website: string | null;
   languages: string[];
+  food_type: string[];
+  dietary_options: string[];
+  payment_methods: string[];
+  features: string[];
   is_active: boolean;
   is_claimed: boolean;
   short_code: string | null;

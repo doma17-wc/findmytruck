@@ -3,27 +3,39 @@
 import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
-import type { TruckStop } from "@/lib/data";
-import { formatTimeRange, isNowWithin } from "@/lib/geo";
+import { formatTimeRange } from "@/lib/geo";
+import type { TruckStatusEntry } from "./HomeClient";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
 
 const ZURICH_CENTER: [number, number] = [8.5417, 47.3769];
 
+const PIN_COLORS = {
+  open: "#22c55e",
+  opens_today: "#f97316",
+  next_day: "#A3A3A3",
+  none: "#A3A3A3",
+} as const;
+
+const BADGE_COLORS = {
+  open: "#22c55e",
+  opens_today: "#f97316",
+  next_day: "#737373",
+  none: "#737373",
+} as const;
+
 interface TruckMapProps {
-  stops: TruckStop[];
+  trucks: TruckStatusEntry[];
   userLocation: [number, number] | null;
   selectedTruckId: string | null;
   onSelectTruck: (truckId: string | null) => void;
-  now?: Date;
 }
 
 export default function TruckMap({
-  stops,
+  trucks,
   userLocation,
   selectedTruckId,
   onSelectTruck,
-  now = new Date(),
 }: TruckMapProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -81,7 +93,7 @@ export default function TruckMap({
     if (!map) return;
 
     const existingIds = new Set(markersRef.current.keys());
-    const nextIds = new Set(stops.map((s) => s.truck.id));
+    const nextIds = new Set(trucks.map((t) => t.truck.id));
 
     // Remove stale markers
     for (const id of existingIds) {
@@ -92,9 +104,11 @@ export default function TruckMap({
       }
     }
 
-    stops.forEach(({ truck, schedule }) => {
+    trucks.forEach(({ truck, status }) => {
+      const schedule = status.schedule!;
       const lngLat: [number, number] = [schedule.location_lng, schedule.location_lat];
-      const open = isNowWithin(schedule.start_time, schedule.end_time, now);
+      const pinColor = PIN_COLORS[status.state];
+      const badgeColor = BADGE_COLORS[status.state];
 
       const popupHtml = `
         <div style="font-family: 'Inter', system-ui, sans-serif; min-width: 220px;">
@@ -103,9 +117,9 @@ export default function TruckMap({
               <span style="font-weight: 700; font-size: 15px; color: #111;">${escapeHtml(
                 truck.name
               )}</span>
-              <span style="font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; color: white; background: ${
-                open ? "#22c55e" : "#171717"
-              };">${open ? "OPEN" : "CLOSED"}</span>
+              <span style="font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; color: white; background: ${badgeColor};">${escapeHtml(
+                status.label
+              )}</span>
             </div>
             <div style="font-size: 13px; color: #666; margin-top: 3px;">${escapeHtml(
               truck.cuisine_type.join(", ")
@@ -131,7 +145,7 @@ export default function TruckMap({
         el.style.cssText = `
           width: 40px; height: 40px; border-radius: 50% 50% 50% 4px;
           transform: rotate(45deg);
-          background: ${open ? "#FF6A00" : "#A3A3A3"};
+          background: ${pinColor};
           border: 3px solid white;
           box-shadow: 0 3px 8px rgba(0,0,0,0.35);
           display: flex; align-items: center; justify-content: center;
@@ -141,7 +155,7 @@ export default function TruckMap({
         inner.textContent = "🚚";
         inner.style.cssText = "display:block; transform: rotate(-45deg); font-size: 17px;";
         el.appendChild(inner);
-        if (open) el.classList.add("pulse-ring");
+        if (status.state === "open") el.classList.add("pulse-ring");
 
         const popup = new mapboxgl.Popup({ offset: 28, closeButton: true }).setHTML(popupHtml);
         popupsRef.current.set(truck.id, popup);
@@ -158,12 +172,12 @@ export default function TruckMap({
         marker.setLngLat(lngLat);
         marker.getPopup()?.setHTML(popupHtml);
         const el = marker.getElement();
-        el.style.background = open ? "#FF6A00" : "#A3A3A3";
-        el.classList.toggle("pulse-ring", open);
+        el.style.background = pinColor;
+        el.classList.toggle("pulse-ring", status.state === "open");
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stops, now]);
+  }, [trucks]);
 
   // React to external selection (e.g. clicking a list item)
   useEffect(() => {

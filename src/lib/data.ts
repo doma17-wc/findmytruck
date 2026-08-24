@@ -1,51 +1,5 @@
 import { supabase } from "./supabase";
-import { getMondayFirstDay } from "./geo";
 import type { PublicTruck, TruckSchedule, TruckPhoto } from "./types";
-
-export interface TruckStop {
-  truck: PublicTruck;
-  schedule: TruckSchedule;
-}
-
-/** All schedule entries for today (Mon-first day index) joined with their public truck data. */
-export async function getTodaysTruckStops(date: Date = new Date()): Promise<TruckStop[]> {
-  const dayOfWeek = getMondayFirstDay(date);
-
-  const { data, error } = await supabase
-    .from("truck_schedules")
-    .select(
-      `
-      id, truck_id, day_of_week, location_name, location_lat, location_lng,
-      start_time, end_time, is_recurring, specific_date, notes,
-      truck:public_trucks!inner (
-        id, slug, name, description, cuisine_type, price_range,
-        logo_url, cover_photo_url, menu_text, menu_photo_url,
-        instagram, tiktok, website, languages,
-        is_active, is_claimed, short_code, created_at, updated_at
-      )
-    `
-    )
-    .eq("day_of_week", dayOfWeek);
-
-  if (error) {
-    console.error("getTodaysTruckStops error", error);
-    return [];
-  }
-
-  type Row = Omit<TruckSchedule, "truck_id"> & {
-    truck_id: string;
-    truck: PublicTruck | PublicTruck[];
-  };
-
-  return ((data ?? []) as unknown as Row[])
-    .map((row) => {
-      const truck = Array.isArray(row.truck) ? row.truck[0] : row.truck;
-      if (!truck || !truck.is_active) return null;
-      const { truck: _t, ...schedule } = row;
-      return { truck, schedule: schedule as TruckSchedule };
-    })
-    .filter((x): x is TruckStop => x !== null);
-}
 
 export async function getTruckBySlug(slug: string): Promise<PublicTruck | null> {
   const { data, error } = await supabase
@@ -88,6 +42,44 @@ export async function getTruckPhotos(truckId: string): Promise<TruckPhoto[]> {
     return [];
   }
   return (data ?? []) as TruckPhoto[];
+}
+
+export interface TruckWithSchedules {
+  truck: PublicTruck;
+  schedules: TruckSchedule[];
+}
+
+/** Every active truck with its FULL weekly schedule (not just today's), so the
+ * map/list can always show every truck along with when it's next open. */
+export async function getAllTrucksWithSchedules(): Promise<TruckWithSchedules[]> {
+  const { data, error } = await supabase
+    .from("public_trucks")
+    .select(
+      `
+      id, slug, name, description, cuisine_type, price_range,
+      logo_url, cover_photo_url, menu_text, menu_photo_url,
+      instagram, tiktok, website, languages,
+      food_type, dietary_options, payment_methods, features,
+      is_active, is_claimed, short_code, created_at, updated_at,
+      truck_schedules (
+        id, truck_id, day_of_week, location_name, location_lat, location_lng,
+        start_time, end_time, is_recurring, specific_date, notes
+      )
+    `
+    )
+    .eq("is_active", true)
+    .order("name", { ascending: true });
+
+  if (error) {
+    console.error("getAllTrucksWithSchedules error", error);
+    return [];
+  }
+
+  type Row = PublicTruck & { truck_schedules: TruckSchedule[] | null };
+  return ((data ?? []) as unknown as Row[]).map((row) => {
+    const { truck_schedules, ...truck } = row;
+    return { truck: truck as PublicTruck, schedules: truck_schedules ?? [] };
+  });
 }
 
 export async function getAllActiveTrucks(): Promise<PublicTruck[]> {

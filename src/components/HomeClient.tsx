@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { Search } from "lucide-react";
-import type { TruckStop } from "@/lib/data";
-import { distanceKm, isNowWithin } from "@/lib/geo";
+import type { TruckWithSchedules } from "@/lib/data";
+import { distanceKm, computeTruckStatus, type TruckStatus } from "@/lib/geo";
 import TruckListItem from "./TruckListItem";
 
 const TruckMap = dynamic(() => import("./TruckMap"), {
@@ -18,13 +18,25 @@ const TruckMap = dynamic(() => import("./TruckMap"), {
 
 const ZURICH_CENTER: [number, number] = [8.5417, 47.3769];
 
+const STATE_PRIORITY: Record<TruckStatus["state"], number> = {
+  open: 0,
+  opens_today: 1,
+  next_day: 2,
+  none: 3,
+};
+
+export interface TruckStatusEntry {
+  truck: TruckWithSchedules["truck"];
+  status: TruckStatus;
+}
+
 interface HomeClientProps {
-  initialStops: TruckStop[];
+  initialTrucks: TruckWithSchedules[];
   signedIn: boolean;
   favoritedIds: string[];
 }
 
-export default function HomeClient({ initialStops, signedIn, favoritedIds }: HomeClientProps) {
+export default function HomeClient({ initialTrucks, signedIn, favoritedIds }: HomeClientProps) {
   const [userLocation, setUserLocation] = useState<[number, number] | null>(null);
   const [locationDenied, setLocationDenied] = useState(false);
   const [selectedTruckId, setSelectedTruckId] = useState<string | null>(null);
@@ -50,53 +62,57 @@ export default function HomeClient({ initialStops, signedIn, favoritedIds }: Hom
     );
   }, []);
 
-  const filteredStops = useMemo(() => {
+  const filteredTrucks = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return initialStops;
-    return initialStops.filter(
-      (s) =>
-        s.truck.name.toLowerCase().includes(q) ||
-        s.truck.cuisine_type.some((c) => c.toLowerCase().includes(q))
+    if (!q) return initialTrucks;
+    return initialTrucks.filter(
+      ({ truck }) =>
+        truck.name.toLowerCase().includes(q) ||
+        truck.cuisine_type.some((c) => c.toLowerCase().includes(q))
     );
-  }, [initialStops, query]);
+  }, [initialTrucks, query]);
 
   const referencePoint = userLocation ?? ZURICH_CENTER;
 
-  const sortedStops = useMemo(() => {
-    return [...filteredStops].sort((a, b) => {
-      const aOpen = isNowWithin(a.schedule.start_time, a.schedule.end_time, now);
-      const bOpen = isNowWithin(b.schedule.start_time, b.schedule.end_time, now);
-      if (aOpen !== bOpen) return aOpen ? -1 : 1;
+  // Only trucks that have ever been scheduled somewhere can get a pin/card.
+  const withStatus: TruckStatusEntry[] = useMemo(() => {
+    return filteredTrucks
+      .map(({ truck, schedules }) => ({ truck, status: computeTruckStatus(schedules, now) }))
+      .filter((entry) => entry.status.schedule !== null);
+  }, [filteredTrucks, now]);
+
+  const sortedTrucks = useMemo(() => {
+    return [...withStatus].sort((a, b) => {
+      const pa = STATE_PRIORITY[a.status.state];
+      const pb = STATE_PRIORITY[b.status.state];
+      if (pa !== pb) return pa - pb;
 
       const da = distanceKm(
         referencePoint[1],
         referencePoint[0],
-        a.schedule.location_lat,
-        a.schedule.location_lng
+        a.status.schedule!.location_lat,
+        a.status.schedule!.location_lng
       );
       const db = distanceKm(
         referencePoint[1],
         referencePoint[0],
-        b.schedule.location_lat,
-        b.schedule.location_lng
+        b.status.schedule!.location_lat,
+        b.status.schedule!.location_lng
       );
       return da - db;
     });
-  }, [filteredStops, referencePoint, now]);
+  }, [withStatus, referencePoint]);
 
-  const openCount = sortedStops.filter((s) =>
-    isNowWithin(s.schedule.start_time, s.schedule.end_time, now)
-  ).length;
+  const openCount = sortedTrucks.filter((t) => t.status.state === "open").length;
 
   return (
     <div className="flex flex-col">
       <div className="relative h-[62vh] w-full sm:h-[68vh]">
         <TruckMap
-          stops={sortedStops}
+          trucks={sortedTrucks}
           userLocation={userLocation}
           selectedTruckId={selectedTruckId}
           onSelectTruck={setSelectedTruckId}
-          now={now}
         />
 
         <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center px-4 pt-4">
@@ -121,37 +137,37 @@ export default function HomeClient({ initialStops, signedIn, favoritedIds }: Hom
       <div className="mx-auto w-full max-w-6xl px-4 py-5">
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-extrabold text-neutral-900">
-            Today&apos;s trucks {sortedStops.length > 0 && `(${sortedStops.length})`}
+            Trucks {sortedTrucks.length > 0 && `(${sortedTrucks.length})`}
           </h2>
-          {sortedStops.length > 0 && (
+          {openCount > 0 && (
             <span className="text-sm font-semibold text-green-600">{openCount} open now</span>
           )}
         </div>
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {sortedStops.length === 0 ? (
+          {sortedTrucks.length === 0 ? (
             <p className="col-span-full py-10 text-center text-sm text-neutral-500">
-              No trucks match &quot;{query}&quot; right now.
+              No trucks match &quot;{query}&quot;.
             </p>
           ) : (
-            sortedStops.map((stop) => (
+            sortedTrucks.map(({ truck, status }) => (
               <TruckListItem
-                key={stop.schedule.id}
-                stop={stop}
-                isOpen={isNowWithin(stop.schedule.start_time, stop.schedule.end_time, now)}
+                key={truck.id}
+                truck={truck}
+                status={status}
                 signedIn={signedIn}
-                isFavorited={favoritedSet.has(stop.truck.id)}
+                isFavorited={favoritedSet.has(truck.id)}
                 distanceKm={
                   userLocation
                     ? distanceKm(
                         userLocation[1],
                         userLocation[0],
-                        stop.schedule.location_lat,
-                        stop.schedule.location_lng
+                        status.schedule!.location_lat,
+                        status.schedule!.location_lng
                       )
                     : null
                 }
-                onSelect={() => setSelectedTruckId(stop.truck.id)}
+                onSelect={() => setSelectedTruckId(truck.id)}
               />
             ))
           )}

@@ -2,28 +2,35 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import type { TruckStop } from "@/lib/data";
-import { formatDistance, formatTimeRange } from "@/lib/geo";
+import type { PublicTruck } from "@/lib/types";
+import { formatDistance, formatTimeRange, type TruckStatus } from "@/lib/geo";
 import FavoriteButton from "@/components/FavoriteButton";
 
 interface TruckListItemProps {
-  stop: TruckStop;
+  truck: PublicTruck;
+  status: TruckStatus;
   distanceKm: number | null;
-  isOpen: boolean;
   signedIn: boolean;
   isFavorited: boolean;
   onSelect: () => void;
 }
 
+const BADGE_CLASSES: Record<TruckStatus["state"], string> = {
+  open: "bg-green-500 text-white",
+  opens_today: "bg-orange-500 text-white",
+  next_day: "bg-neutral-500 text-white",
+  none: "bg-neutral-900/80 text-white",
+};
+
 export default function TruckListItem({
-  stop,
+  truck,
+  status,
   distanceKm,
-  isOpen,
   signedIn,
   isFavorited,
   onSelect,
 }: TruckListItemProps) {
-  const { truck, schedule } = stop;
+  const schedule = status.schedule!;
   const image = truck.cover_photo_url ?? truck.logo_url;
 
   return (
@@ -46,11 +53,9 @@ export default function TruckListItem({
 
         <div className="absolute left-3 top-3">
           <span
-            className={`rounded-full px-2.5 py-1 text-xs font-bold shadow-sm ${
-              isOpen ? "bg-green-500 text-white" : "bg-neutral-900/80 text-white"
-            }`}
+            className={`rounded-full px-2.5 py-1 text-xs font-bold shadow-sm ${BADGE_CLASSES[status.state]}`}
           >
-            {isOpen ? "Open now" : "Closed"}
+            {status.label}
           </span>
         </div>
 

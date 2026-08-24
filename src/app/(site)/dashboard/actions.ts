@@ -37,19 +37,16 @@ export async function saveOwnTruckAction(
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Name is required." };
 
-  const cuisineType = String(formData.get("cuisine_type") ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const languages = String(formData.get("languages") ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
+  const csv = (key: string) =>
+    String(formData.get(key) ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
 
   const payload = {
     name,
     description: String(formData.get("description") ?? "") || null,
-    cuisine_type: cuisineType,
+    cuisine_type: csv("cuisine_type"),
     price_range: String(formData.get("price_range") ?? "") || null,
     logo_url: String(formData.get("logo_url") ?? "") || null,
     cover_photo_url: String(formData.get("cover_photo_url") ?? "") || null,
@@ -59,7 +56,11 @@ export async function saveOwnTruckAction(
     tiktok: String(formData.get("tiktok") ?? "") || null,
     website: String(formData.get("website") ?? "") || null,
     phone: String(formData.get("phone") ?? "") || null,
-    languages,
+    languages: csv("languages"),
+    food_type: csv("food_type"),
+    dietary_options: csv("dietary_options"),
+    payment_methods: csv("payment_methods"),
+    features: csv("features"),
     is_active: formData.get("is_active") === "on",
   };
 
