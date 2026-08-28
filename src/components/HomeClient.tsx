@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { Search } from "lucide-react";
 import type { TruckWithSchedules } from "@/lib/data";
 import { distanceKm, computeTruckStatus, type TruckStatus } from "@/lib/geo";
+import { DEFAULT_MAP_CENTER } from "@/lib/cities";
 import TruckListItem from "./TruckListItem";
 
 const TruckMap = dynamic(() => import("./TruckMap"), {
@@ -15,8 +16,6 @@ const TruckMap = dynamic(() => import("./TruckMap"), {
     </div>
   ),
 });
-
-const ZURICH_CENTER: [number, number] = [8.5417, 47.3769];
 
 const STATE_PRIORITY: Record<TruckStatus["state"], number> = {
   open: 0,
@@ -72,7 +71,7 @@ export default function HomeClient({ initialTrucks, signedIn, favoritedIds }: Ho
     );
   }, [initialTrucks, query]);
 
-  const referencePoint = userLocation ?? ZURICH_CENTER;
+  const referencePoint = userLocation ?? DEFAULT_MAP_CENTER;
 
   // Only trucks that have ever been scheduled somewhere can get a pin/card.
   const withStatus: TruckStatusEntry[] = useMemo(() => {
@@ -129,7 +128,7 @@ export default function HomeClient({ initialTrucks, signedIn, favoritedIds }: Ho
 
         {locationDenied && (
           <div className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-full bg-white/95 px-3 py-1.5 text-xs font-medium text-neutral-600 shadow">
-            Showing Zurich · enable location for distances
+            Showing all trucks · enable location for distances
           </div>
         )}
       </div>

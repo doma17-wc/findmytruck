@@ -20,10 +20,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const truck = await getTruckBySlug(params.slug);
   if (!truck) return {};
 
-  const title = `${truck.name} — Food Truck in Zurich`;
+  const title = `${truck.name} — Food Truck in Switzerland`;
   const description =
     truck.description ??
-    `Find ${truck.name}'s schedule, menu, and location in Zurich on FindMyTruck.`;
+    `Find ${truck.name}'s schedule, menu, and location in Switzerland on FindMyTruck.`;
   const images = truck.cover_photo_url ? [truck.cover_photo_url] : [];
 
   return {
@@ -93,7 +93,7 @@ export default async function TruckProfilePage({ params }: PageProps) {
     sameAs: [truck.instagram, truck.tiktok, truck.website].filter(Boolean),
     address: {
       "@type": "PostalAddress",
-      addressLocality: "Zurich",
+      ...(nextStop?.location_name && { addressLocality: nextStop.location_name }),
       addressCountry: "CH",
     },
     ...(nextStop && {

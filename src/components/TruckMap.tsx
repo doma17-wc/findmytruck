@@ -4,11 +4,10 @@ import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { formatTimeRange } from "@/lib/geo";
+import { DEFAULT_MAP_CENTER } from "@/lib/cities";
 import type { TruckStatusEntry } from "./HomeClient";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
-
-const ZURICH_CENTER: [number, number] = [8.5417, 47.3769];
 
 const PIN_COLORS = {
   open: "#22c55e",
@@ -42,6 +41,7 @@ export default function TruckMap({
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
   const popupsRef = useRef<Map<string, mapboxgl.Popup>>(new Map());
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
+  const didAutoFitRef = useRef(false);
 
   // Initialize map once
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function TruckMap({
     const map = new mapboxgl.Map({
       container: mapContainerRef.current,
       style: "mapbox://styles/mapbox/streets-v12",
-      center: ZURICH_CENTER,
+      center: DEFAULT_MAP_CENTER,
       zoom: 13,
     });
 
@@ -86,6 +86,35 @@ export default function TruckMap({
 
     map.flyTo({ center: userLocation, zoom: 14 });
   }, [userLocation]);
+
+  // With no user location, frame the map around every truck once they load.
+  // A single cluster (e.g. all in Zurich) stays zoomed in; trucks spread across
+  // Switzerland zoom the map out far enough to show them all.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || userLocation || didAutoFitRef.current) return;
+
+    const points = trucks
+      .filter((t) => t.status.schedule)
+      .map(
+        (t) =>
+          [t.status.schedule!.location_lng, t.status.schedule!.location_lat] as [number, number]
+      );
+    if (points.length === 0) return;
+
+    didAutoFitRef.current = true;
+
+    if (points.length === 1) {
+      map.flyTo({ center: points[0], zoom: 13 });
+      return;
+    }
+
+    const bounds = points.reduce(
+      (b, p) => b.extend(p),
+      new mapboxgl.LngLatBounds(points[0], points[0])
+    );
+    map.fitBounds(bounds, { padding: 72, maxZoom: 14, duration: 600 });
+  }, [trucks, userLocation]);
 
   // Truck markers
   useEffect(() => {

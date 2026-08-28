@@ -6,7 +6,7 @@ import Link from "next/link";
 import { Search } from "lucide-react";
 import type { PublicTruck } from "@/lib/types";
 
-export default function ZurichBrowseClient({ trucks }: { trucks: PublicTruck[] }) {
+export default function CityBrowseClient({ trucks }: { trucks: PublicTruck[] }) {
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { GEOCODE_COUNTRY } from "@/lib/cities";
 
 interface GeocodeFeature {
   place_name: string;
@@ -27,7 +28,7 @@ export default function LocationSearch({ onSelect }: LocationSearchProps) {
       const token = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
       const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
         query
-      )}.json?access_token=${token}&proximity=8.5417,47.3769&bbox=8.4,47.28,8.65,47.46&limit=5`;
+      )}.json?access_token=${token}&country=${GEOCODE_COUNTRY}&limit=5`;
       try {
         const res = await fetch(url);
         const json = await res.json();
@@ -48,7 +49,7 @@ export default function LocationSearch({ onSelect }: LocationSearchProps) {
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => results.length > 0 && setOpen(true)}
-        placeholder="Search an address in Zurich…"
+        placeholder="Search an address in Switzerland…"
         className="w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-[15px] focus:border-brand focus:outline-none"
       />
       {open && results.length > 0 && (
