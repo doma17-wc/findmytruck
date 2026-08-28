@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { normalizeMenuItems } from "@/lib/menu";
+import { PHOTO_BUCKET, storagePathFromPublicUrl } from "@/lib/storage";
 
 async function requireOwnTruckId(): Promise<string> {
   const supabase = createClient();
@@ -50,7 +52,6 @@ export async function saveOwnTruckAction(
     price_range: String(formData.get("price_range") ?? "") || null,
     logo_url: String(formData.get("logo_url") ?? "") || null,
     cover_photo_url: String(formData.get("cover_photo_url") ?? "") || null,
-    menu_text: String(formData.get("menu_text") ?? "") || null,
     menu_photo_url: String(formData.get("menu_photo_url") ?? "") || null,
     instagram: String(formData.get("instagram") ?? "") || null,
     tiktok: String(formData.get("tiktok") ?? "") || null,
@@ -67,8 +68,21 @@ export async function saveOwnTruckAction(
   const { error } = await supabase.from("trucks").update(payload).eq("id", truckId);
   if (error) return { error: error.message };
 
+  // Structured menu lives in the `menu_items` column (migration 0004). Written
+  // separately so the rest of the profile still saves if that migration hasn't
+  // been applied yet.
+  const menuItems = normalizeMenuItems(formData.get("menu_items"));
+  const { error: menuError } = await supabase
+    .from("trucks")
+    .update({ menu_items: menuItems })
+    .eq("id", truckId);
+  if (menuError && !menuError.message.includes("menu_items")) {
+    return { error: menuError.message };
+  }
+
   revalidatePath("/dashboard");
   revalidatePath("/");
+  revalidatePath("/trucks/[slug]", "page");
   return { success: true };
 }
 
@@ -128,6 +142,39 @@ export async function addOwnPhotoAction(url: string, caption: string) {
 export async function deleteOwnPhotoAction(photoId: string) {
   const truckId = await requireOwnTruckId();
   const supabase = createClient();
+
+  const { data: row } = await supabase
+    .from("truck_photos")
+    .select("url")
+    .eq("id", photoId)
+    .eq("truck_id", truckId)
+    .maybeSingle();
+
   await supabase.from("truck_photos").delete().eq("id", photoId).eq("truck_id", truckId);
+
+  const path = storagePathFromPublicUrl(row?.url);
+  if (path) {
+    await supabase.storage.from(PHOTO_BUCKET).remove([path]);
+  }
+
   revalidatePath("/dashboard");
+  revalidatePath("/");
+}
+
+export async function reorderOwnPhotosAction(orderedIds: string[]) {
+  const truckId = await requireOwnTruckId();
+  const supabase = createClient();
+
+  await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase
+        .from("truck_photos")
+        .update({ sort_order: index })
+        .eq("id", id)
+        .eq("truck_id", truckId)
+    )
+  );
+
+  revalidatePath("/dashboard");
+  revalidatePath("/");
 }

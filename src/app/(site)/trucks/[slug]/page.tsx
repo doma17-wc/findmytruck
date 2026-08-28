@@ -6,6 +6,8 @@ import { ArrowLeft, Globe, Music2, Navigation } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { getTruckBySlug, getTruckPhotos, getTruckSchedule } from "@/lib/data";
 import { DAY_LABELS, DAY_LABELS_SHORT } from "@/lib/types";
+import { normalizeMenuItems } from "@/lib/menu";
+import TruckMenu from "@/components/site/TruckMenu";
 import { formatTimeRange, getMondayFirstDay, isNowWithin } from "@/lib/geo";
 import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
 import FavoriteButton from "@/components/FavoriteButton";
@@ -71,6 +73,8 @@ export default async function TruckProfilePage({ params }: PageProps) {
       .maybeSingle();
     isFavorited = Boolean(data);
   }
+
+  const menuItems = normalizeMenuItems(truck.menu_items);
 
   const today = getMondayFirstDay();
   const todaySchedule = schedule.filter((s) => s.day_of_week === today);
@@ -282,13 +286,17 @@ export default async function TruckProfilePage({ params }: PageProps) {
             </div>
           </section>
 
-          {(truck.menu_text || truck.menu_photo_url) && (
+          {(menuItems.length > 0 || truck.menu_text || truck.menu_photo_url) && (
             <section className="mt-9">
               <h2 className="text-lg font-bold text-neutral-900">Menu</h2>
-              {truck.menu_text && (
-                <p className="mt-3 whitespace-pre-line text-[15px] leading-relaxed text-neutral-700">
-                  {truck.menu_text}
-                </p>
+              {menuItems.length > 0 ? (
+                <TruckMenu items={menuItems} />
+              ) : (
+                truck.menu_text && (
+                  <p className="mt-3 whitespace-pre-line text-[15px] leading-relaxed text-neutral-700">
+                    {truck.menu_text}
+                  </p>
+                )
               )}
               {truck.menu_photo_url && (
                 <div className="relative mt-4 h-96 w-full overflow-hidden rounded-2xl bg-neutral-100">

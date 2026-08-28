@@ -1,3 +1,7 @@
+import type { MenuItem } from "./menu";
+
+export type { MenuItem } from "./menu";
+
 export interface PublicTruck {
   id: string;
   slug: string;
@@ -8,6 +12,9 @@ export interface PublicTruck {
   logo_url: string | null;
   cover_photo_url: string | null;
   menu_text: string | null;
+  /** Structured menu (migration 0004). May be absent on rows read before the
+   * migration has been applied — always run through normalizeMenuItems(). */
+  menu_items?: MenuItem[] | null;
   menu_photo_url: string | null;
   instagram: string | null;
   tiktok: string | null;

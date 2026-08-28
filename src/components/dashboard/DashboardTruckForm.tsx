@@ -3,8 +3,11 @@
 import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import type { Truck } from "@/lib/types";
+import { normalizeMenuItems } from "@/lib/menu";
 import { saveOwnTruckAction, type DashboardFormState } from "@/app/(site)/dashboard/actions";
 import ChipSelect from "./ChipSelect";
+import ImageDropzone from "./ImageDropzone";
+import MenuBuilder from "./MenuBuilder";
 import {
   CUISINE_OPTIONS,
   PRICE_RANGE_OPTIONS,
@@ -176,31 +179,36 @@ export default function DashboardTruckForm({ truck }: { truck: Truck }) {
         onToggle={(opt) => setFeatures((prev) => toggleValue(prev, opt))}
       />
 
-      <div className="grid grid-cols-2 gap-3">
-        <Field label="Logo URL">
-          <input name="logo_url" defaultValue={truck.logo_url ?? ""} className={inputClass} />
-        </Field>
-        <Field label="Cover photo URL">
-          <input
-            name="cover_photo_url"
-            defaultValue={truck.cover_photo_url ?? ""}
-            className={inputClass}
-          />
-        </Field>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <ImageDropzone
+          name="logo_url"
+          label="Logo"
+          truckId={truck.id}
+          initialUrl={truck.logo_url}
+          aspect="square"
+        />
+        <ImageDropzone
+          name="cover_photo_url"
+          label="Cover photo"
+          truckId={truck.id}
+          initialUrl={truck.cover_photo_url}
+          aspect="wide"
+        />
       </div>
 
-      <Field label="Menu (text)">
-        <textarea
-          name="menu_text"
-          defaultValue={truck.menu_text ?? ""}
-          rows={4}
-          className={inputClass}
-        />
-      </Field>
+      <div>
+        <span className="mb-1.5 block text-sm font-medium text-neutral-700">Menu</span>
+        <MenuBuilder name="menu_items" initial={normalizeMenuItems(truck.menu_items)} />
+      </div>
 
-      <Field label="Menu photo URL">
-        <input name="menu_photo_url" defaultValue={truck.menu_photo_url ?? ""} className={inputClass} />
-      </Field>
+      <ImageDropzone
+        name="menu_photo_url"
+        label="Menu photo"
+        truckId={truck.id}
+        initialUrl={truck.menu_photo_url}
+        aspect="wide"
+        hint="optional — a photo of your printed menu"
+      />
 
       <div className="grid grid-cols-3 gap-3">
         <Field label="Instagram">
