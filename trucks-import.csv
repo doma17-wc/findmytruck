@@ -1,0 +1,96 @@
+name,slug,cuisine_type,description,region,fixed_lunch,website,source_category
+Phill's BBQ,phills-bbq,BBQ,"BBQ - Spareribs, Beef Brisket, Pulled Pork",Cham (ZG),Yes,https://phills.ch,BBQ & Grill
+1982 - Michi's Foodtruck,1982-michis-foodtruck,Other,"Baked Potatoes wechselnde Toppings, Currywurst",Baar / Cham (ZG),Yes,https://1982-foodtruck.ch,Kartoffeln & Co.
+Laxmanufaktur (LA X FoodTruck),laxmanufaktur-la-x-foodtruck,Seafood,Geräucherte Lachsspezialitäten,Neuheim (ZG),Yes,https://laxmanufaktur.ch,Fisch
+Ifigenia Food Truck,ifigenia-food-truck,Greek|Mediterranean,Authentisch griechisch,Zug-Region,Yes,https://ifigenia.ch,Mediterran
+Enrico Tezzele Foodtruck,enrico-tezzele-foodtruck,Other,"Ehrliches Essen, wechselndes Angebot",Kanton Zug,Partly,,Wechselnd
+Taco Connection,taco-connection,Mexican,Mexikanisch (Tacos),Baar (ZG),Partly,,Latin / TexMex
+Bánh Mì 136,b-nh-m-136,Asian,Vietnamesisch (Bánh Mì),Zürich (Europaallee),Partly,,Asiatisch
+Foodtruck Kottu Roti,foodtruck-kottu-roti,Asian,Sri-lankisch / tamilisch (Kottu Roti),Zürich,Partly,,Asiatisch
+Cima Curry,cima-curry,Asian,Indisch,Zürich Kreis 4,Partly,,Asiatisch
+Lucky's Thai Food,luckys-thai-food,Asian,Thailändisch,Zürich,Partly,,Asiatisch
+Aroimak,aroimak,Asian,Thai Streetfood (3 Trucks),Grossraum Zürich,Partly,,Asiatisch
+Shangrila Tibet Foodtruck,shangrila-tibet-foodtruck,Asian,Tibetisch,Zürich Wiedikon,Partly,,Asiatisch
+Tenz Momo Foodtruck,tenz-momo-foodtruck,Asian,Tibetische Momos,Zürich,Partly,,Asiatisch
+Golden Momo (Tenzin Momo),golden-momo-tenzin-momo,Asian,Tibetische Momos,Zürich,No,,Asiatisch
+Lobsang Momos,lobsang-momos,Asian,Tibetische Momos,Zürich-Region,No,,Asiatisch
+Topden Catering,topden-catering,Asian,Asiatisch mit westlichem Touch,Zürich (Take Away),Partly,,Asiatisch
+Wesley's Kitchen,wesleys-kitchen,Asian,Fernöstlich / asiatisch,Zürich-Region,No,,Asiatisch
+Panda Pan,panda-pan,Asian|Vegan/Vegetarian,"Asiatisch, oft vegan (Peking Ente)",Zürich-Region,No,,Asiatisch / Vegan
+De Koreaner 59,de-koreaner-59,Asian,Koreanisch Streetfood,Zürich-Region,No,,Asiatisch
+Thai Wägeli,thai-waegeli,Asian,Thai Nudelsuppen (Piaggio Ape),Winterthur (ZH),Partly,,Asiatisch
+Thai Moving Noodles,thai-moving-noodles,Asian,Thai Nudelsuppen,Zürich-Region,No,,Asiatisch
+The Thai,the-thai,Asian,Authentische Thai Küche,Zürich-Region,Partly,,Asiatisch
+Thonglor's Cuisine,thonglors-cuisine,Asian,Südostasiatisch / Thai,Zürich-Region,No,,Asiatisch
+Loving Lanka,loving-lanka,Asian,Tamilisch / Sri Lanka Curries,Zürich-Region,No,,Asiatisch
+Roshan's - Kitchen of Legends,roshans-kitchen-of-legends,Asian,Sri Lanka / Fusion,Zürich-Region,No,,Asiatisch / Fusion
+Acapulco Grill,acapulco-grill,Mexican,Mexikanisch (Horse Trailer),Zürich,Partly,,Latin
+La Chamaca,la-chamaca,Mexican,Mexikanisch (Tacos),Zürich / Zentralschweiz,No,,Latin
+Mexica,mexica,Mexican,"Mexikanisch (Tacos, Burritos)",Zürich-Region,No,,Latin
+El Tacon de Oro,el-tacon-de-oro,Mexican,Traditionell mexikanisch,Zürich-Region,No,,Latin
+El Turpial,el-turpial,Mexican,Venezolanisch (Arepas),Zürich-Region,No,,Latin
+Empanadas.ch,empanadas-ch,Mexican,Argentinische Empanadas (Citroen HY),Zürich-Region,No,,Latin
+Trulli's Fajitas,trullis-fajitas,Mexican,Fajitas (glutenfrei/laktosefrei Opt.),Zürich-Region,No,,Latin / TexMex
+Afghan Laziz,afghan-laziz,Middle Eastern,Afghanisch,Zürich,Partly,,Middle East
+Tabliya,tabliya,Middle Eastern,Ägyptisch,Wetzikon (ZH),Partly,,Middle East
+Sha's Road Grill,shas-road-grill,Middle Eastern,Iran/Türkei/Schweiz Mix,Pratteln (BL),Partly,,Middle East
+Ada Lokma,ada-lokma,Middle Eastern,Anatolisch (vegan/vegi/Fleisch),Zürich-Region,Partly,,Middle East
+Oh my Greek,oh-my-greek,Greek|Mediterranean,Griechisch Streetfood,Zürich / CH,Partly,,Mediterran
+Napulé,napul,Pizza|Italian,Neapolitanische Pizza (Weltmeister),Zürich-Region,Partly,,Pizza / Pasta
+Woody Pizza,woody-pizza,Pizza|Italian,Holzofenpizza (Oldtimer Saurer),Zürich-Region,No,,Pizza / Pasta
+Pinsa Foodtruck,pinsa-foodtruck,Pizza|Italian,Pinsa (röm. Style),Zürich-Region,No,,Pizza / Pasta
+Gabriele Street Food,gabriele-street-food,Italian|Pizza,Italienisch (fatto a mano),Zürich-Region,Partly,,Pizza / Pasta / Italian
+Moro's,moros,Pizza|Italian,Italienische Pasta (Salento),Zürich-Region,No,,Pizza / Pasta
+Grindogballs,grindogballs,Italian|Pizza,Italienische Meatballs (Citroen HY),Zürich-Region,No,,Pizza / Pasta / Italian
+Hofmann's Risotto,hofmanns-risotto,Italian|Pizza,Risotto & mehr,Zürich-Region,No,,Pizza / Pasta / Italian
+Panzerotteria Manieri,panzerotteria-manieri,Italian|Pizza,Apulische Panzerotti,Zürich-Region,No,,Pizza / Pasta / Italian
+Kitchen Rebels,kitchen-rebels,Other,Kreativ / wechselnd (Land Rover),Zürich,No,,Fusion
+Cucina Mobile,cucina-mobile,BBQ,"Wildspezialitäten, Grill, Piadine",Region Zürich/Winterthur,Partly,,BBQ & Grill
+Franky's BBQ,frankys-bbq,BBQ,BBQ Sandwiches / Burger,Zürich-Region,No,,BBQ & Grill
+Che Grill,che-grill,BBQ,Holzkohlegrill (Streamline),Zürich-Region,No,,BBQ & Grill
+Tobi's & Friends,tobis-friends,BBQ,"Smoker, Ojo de Agua Steak Sandwich",Zürich-Region,No,,BBQ & Grill
+Mundo del Gusto,mundo-del-gusto,BBQ,"BBQ, Burger, Currywurst, Risotto",Zürich-Region,No,,BBQ & Grill
+1A Willi's Lieblingsessen,1a-willis-lieblingsessen,Poke/Bowls,Poke Bowls,Grossraum Zürich,Partly,,Bowls / Healthy
+Açaí Attendant,a-a-attendant,Poke/Bowls|Desserts,Açaí Bowls (Citroen HY),Zürich-Region,No,,Bowls / Dessert
+Greeny Foodtruck,greeny-foodtruck,Poke/Bowls,"Marktküche, frisch & gesund",Zürich-Region,No,,Bowls / Healthy
+Food on Wheels,food-on-wheels,Burgers|Sandwiches,"Mac'n'Cheese, Burger",Zürich-Region,Partly,https://foodonwheels.ch,Burger & Sandwiches
+Fork & Bottle,fork-bottle,Burgers|Sandwiches,Burger & Fries (Feuerwehrauto),Zürich-Region,No,,Burger & Sandwiches
+Society Burger & More,society-burger-more,Burgers|Sandwiches,Burger & Pommes,Zürich-Region,No,,Burger & Sandwiches
+Sigi's Burger,sigis-burger,Burgers|Sandwiches,Burger (Bündner Rindfleisch),Zürich-Region,No,,Burger & Sandwiches
+Joules of Joy,joules-of-joy,Burgers|Sandwiches,Burger & Fries,Zürich-Region,No,,Burger & Sandwiches
+Floka's,flokas,Burgers|Sandwiches,Burger & Pommes,Zürich-Region,No,,Burger & Sandwiches
+De Börner,de-boerner,Burgers|Sandwiches,Burger (CH Bio Fleisch),Zürich-Region,No,,Burger & Sandwiches
+Räbeat by Ramona Schenk,raebeat-by-ramona-schenk,Burgers|Sandwiches,Burger,Berner Oberland,No,,Burger & Sandwiches
+Rhystorante,rhystorante,Burgers|Sandwiches,Ox-Beef Sandwich / Ciabatta,Zürich-Region,No,,Burger & Sandwiches
+Bra-Bro,bra-bro,Burgers|Sandwiches,Bratenbrot / Gourmet Fleisch Sandwich,Zürich-Region,No,,Burger & Sandwiches
+PICNCHICN,picnchicn,Burgers|Sandwiches,Pulled Pork / Chicken Sandwich,Embrach (ZH),No,,Burger & Sandwiches
+Manu's Foodliner,manus-foodliner,Burgers|Sandwiches,"Piadina, Schnitzelbrot, Burger, Hot Dogs",Zürich-Region,No,,Burger & Sandwiches
+Planted Foodtruck,planted-foodtruck,Vegan/Vegetarian,Pflanzlicher Fleischersatz (Poulet-Style),Zürich (Küchenlabor),Partly,,Vegan
+Jaybees Foodtruck,jaybees-foodtruck,Vegan/Vegetarian,"Vegan, hausgemacht",Zürich-Region,No,,Vegan
+Heidi's Foodtruck,heidis-foodtruck,Other,Schweizer Käse-Gerichte + Burger,Zürich-Region,No,,Swiss
+Heidi's Raclette Stübli,heidis-raclette-stuebli,Other,Raclette (mobil),Zürich-Region,No,,Swiss
+Spätzlibaron,spaetzlibaron,Other,Chässpätzli (frisch gehobelt),Zwischen Winterthur & Zürich,Partly,,Swiss
+Feines vom Hof,feines-vom-hof,Other,Schweizer Bauern-Spezialitäten,CH (Bauernverband),No,,Swiss
+Curry Factory,curry-factory,Hot Dogs,"Currywurst, Vegi Burger, Veggie Balls",Zürich-Region,No,,Wurst & Co.
+Don Curry Food Trailer,don-curry-food-trailer,Hot Dogs,Schweizer Currywurst (Schärfegrade),Zürich-Region,No,,Wurst & Co.
+Dr. Dog,dr-dog,Hot Dogs,Hot Dog Kreationen,Zürich-Region,Partly,,Hot-Dog
+Tom's Original,toms-original,Hot Dogs,Hot Dogs (Piaggio Ape Flotte),CH,No,,Hot-Dog
+Spearman's Wrap Hot Dog,spearmans-wrap-hot-dog,Hot Dogs,Wrap Hot Dog (Tortilla),Zürich-Region,No,,Hot-Dog
+Grill n' Roll,grill-n-roll,Crêpes/Waffles,Käse-Wraps (gelber Trailer),Zürich-Region,No,,Crepes / Wraps
+Pommes Atelier / Dutchi,pommes-atelier-dutchi,Other,Frische CH Pommes (Swiss Made),Zürich-Region,No,,Kartoffeln & Co.
+Le Schnauz,le-schnauz,Crêpes/Waffles,Crêpes (Citroen HY + Camper),Zürich-Region,No,,Crepes / Wraps
+Creperia süss & würzig,creperia-suess-wuerzig,Crêpes/Waffles,"Crêpes (süss/salzig, glutenfrei Opt.)",Zürich-Region,No,,Crepes / Wraps
+Huebi's Foodtruck,huebis-foodtruck,Desserts,"Crêpes, Bubble Waffles, Frozen Yoghurt, Kaffee",Zürich-Region,No,,Dessert
+My Bubble & Crêpes,my-bubble-cr-pes,Desserts,Crêpes & Bubble Waffles (VW Bulli),Wiedlisbach-Region,No,,Dessert
+Rollende Gelateria,rollende-gelateria,Desserts,Gelato / Eisdiele,Zürich-Region,No,,Dessert
+Marlene's Street Café,marlenes-street-caf,Desserts,"Dessert-Buffets, Cupcakes, Macarons",Zürich-Region,No,,Dessert
+Petit Frère,petit-fr-re,Coffee/Drinks,Barista Kaffee & Backwaren (Provence Van),Zürich,Partly,,Getränke & Kaffee
+Miró Coffee Truck,mir-coffee-truck,Coffee/Drinks,Kaffee & Brownies,Zürich,Partly,,Getränke & Kaffee
+Coffee Mafia,coffee-mafia,Coffee/Drinks,Barista Kaffee,CH,No,,Getränke & Kaffee
+Barista Bus 1977,barista-bus-1977,Coffee/Drinks,Barista Kaffee (Renault Estafette),Zürich-Region,No,,Getränke & Kaffee
+Porchetta Imbiss,porchetta-imbiss,Hot Dogs,Porchetta Panino (classico/mediteran),Zürich,Partly,,Wurst & Co.
+Zili's Foodtruck,zilis-foodtruck,Other,Allrounder,Zürich-Region,No,,Wechselnd
+Volière,voli-re,Vegan/Vegetarian,Vegetarische Mittagsmenüs (Bistro-Bar),Luzern (Vierwaldstättersee),Partly,,Vegi
+Food-Velotruck,food-velotruck,Vegan/Vegetarian,"Vegan, Weltküche (Velotruck)",Luzern,Partly,,Vegan
+Kupferkessel,kupferkessel,BBQ,"Gourmet bis Streetfood, Grill",Wauwil (LU),Partly,,BBQ & Grill
+Tutku,tutku,Burgers|Sandwiches,Burgers,Sursee (LU),Partly,,Burger & Sandwiches

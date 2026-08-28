@@ -52,23 +52,32 @@ export interface TruckWithSchedules {
 /** Every active truck with its FULL weekly schedule (not just today's), so the
  * map/list can always show every truck along with when it's next open. */
 export async function getAllTrucksWithSchedules(): Promise<TruckWithSchedules[]> {
-  const { data, error } = await supabase
-    .from("public_trucks")
-    .select(
-      `
+  const schedulesSelect = `truck_schedules (
+        id, truck_id, day_of_week, location_name, location_lat, location_lng,
+        start_time, end_time, is_recurring, specific_date, notes
+      )`;
+  const baseCols = `
       id, slug, name, description, cuisine_type, price_range,
       logo_url, cover_photo_url, menu_text, menu_photo_url,
       instagram, tiktok, website, languages,
       food_type, dietary_options, payment_methods, features,
-      is_active, is_claimed, short_code, created_at, updated_at,
-      truck_schedules (
-        id, truck_id, day_of_week, location_name, location_lat, location_lng,
-        start_time, end_time, is_recurring, specific_date, notes
-      )
-    `
-    )
-    .eq("is_active", true)
-    .order("name", { ascending: true });
+      is_active, is_claimed, short_code, created_at, updated_at`;
+  // The unclaimed-profile columns land in migration 0005 -- fall back gracefully
+  // if the code is deployed before that migration has been applied.
+  const unclaimedCols = `claim_status, source_region, source_website, region_lat, region_lng`;
+
+  const run = (cols: string) =>
+    supabase
+      .from("public_trucks")
+      .select(cols)
+      .eq("is_active", true)
+      .order("name", { ascending: true });
+
+  let res = await run(`${baseCols}, ${unclaimedCols}, ${schedulesSelect}`);
+  if (res.error) {
+    res = await run(`${baseCols}, ${schedulesSelect}`);
+  }
+  const { data, error } = res;
 
   if (error) {
     console.error("getAllTrucksWithSchedules error", error);

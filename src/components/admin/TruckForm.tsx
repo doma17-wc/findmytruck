@@ -140,6 +140,37 @@ export default function TruckForm({ truck }: { truck?: Truck }) {
         </Field>
       </div>
 
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Claim status">
+          <select
+            name="claim_status"
+            defaultValue={truck?.claim_status ?? "unclaimed"}
+            className={inputClass}
+          >
+            <option value="unclaimed">Unclaimed (public data)</option>
+            <option value="pending">Pending verification</option>
+            <option value="claimed">Claimed &amp; verified</option>
+          </select>
+        </Field>
+        <Field label="Source region (home base)">
+          <input
+            name="source_region"
+            defaultValue={truck?.source_region ?? ""}
+            className={inputClass}
+            placeholder="e.g. Zürich"
+          />
+        </Field>
+      </div>
+
+      <Field label="Source website (public link)">
+        <input
+          name="source_website"
+          defaultValue={truck?.source_website ?? ""}
+          className={inputClass}
+          placeholder="https://…"
+        />
+      </Field>
+
       <label className="flex items-center gap-2">
         <input
           type="checkbox"

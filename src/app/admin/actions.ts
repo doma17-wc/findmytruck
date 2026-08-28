@@ -60,6 +60,11 @@ export async function saveTruckAction(
     .map((s) => s.trim())
     .filter(Boolean);
 
+  const claimStatusRaw = String(formData.get("claim_status") ?? "unclaimed");
+  const claimStatus = ["unclaimed", "pending", "claimed"].includes(claimStatusRaw)
+    ? claimStatusRaw
+    : "unclaimed";
+
   const payload = {
     name,
     slug: String(formData.get("slug") ?? "").trim() || slugify(name),
@@ -78,6 +83,10 @@ export async function saveTruckAction(
     owner_email: String(formData.get("owner_email") ?? "") || null,
     languages,
     is_active: formData.get("is_active") === "on",
+    claim_status: claimStatus,
+    is_claimed: claimStatus === "claimed",
+    source_region: String(formData.get("source_region") ?? "") || null,
+    source_website: String(formData.get("source_website") ?? "") || null,
   };
 
   if (truckId) {
@@ -106,6 +115,36 @@ export async function deleteTruckAction(truckId: string) {
   await supabase.from("trucks").delete().eq("id", truckId);
   revalidatePath("/admin");
   redirect("/admin");
+}
+
+// ---------- Claims ----------
+
+/** Approve a pending claim: mark the profile fully claimed + verified. */
+export async function approveClaimAction(truckId: string) {
+  await supabase
+    .from("trucks")
+    .update({ claim_status: "claimed", is_claimed: true })
+    .eq("id", truckId);
+  revalidatePath("/admin");
+  revalidatePath("/");
+}
+
+/**
+ * Manually set a truck's claim status (e.g. reject a bad claim back to
+ * 'unclaimed', or mark a truck claimed after onboarding an owner in person).
+ * Note: this only touches the `trucks` table — if an owner account was linked
+ * via /claim, that link stays until they're re-verified.
+ */
+export async function setClaimStatusAction(
+  truckId: string,
+  status: "unclaimed" | "pending" | "claimed"
+) {
+  await supabase
+    .from("trucks")
+    .update({ claim_status: status, is_claimed: status === "claimed" })
+    .eq("id", truckId);
+  revalidatePath("/admin");
+  revalidatePath("/");
 }
 
 // ---------- Schedules ----------

@@ -55,6 +55,9 @@ export interface TruckStatus {
   label: string;
   /** The schedule entry to use for the map pin / location display. */
   schedule: TruckSchedule | null;
+  /** True when `schedule` is a synthetic entry placing the truck at its
+   * region centre because it has no real schedule yet (imported profile). */
+  isRegionFallback?: boolean;
 }
 
 /**

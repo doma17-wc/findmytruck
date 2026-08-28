@@ -29,7 +29,17 @@ export interface PublicTruck {
   short_code: string | null;
   created_at: string;
   updated_at: string;
+  /** Unclaimed-profiles system (migration 0005). May be absent on rows read
+   * before that migration -- always fall back to 'unclaimed'. */
+  claim_status?: ClaimStatus | null;
+  source_region?: string | null;
+  source_website?: string | null;
+  /** Approx. home-base coordinates for trucks with no schedule yet. */
+  region_lat?: number | null;
+  region_lng?: number | null;
 }
+
+export type ClaimStatus = "unclaimed" | "pending" | "claimed";
 
 export interface Truck extends PublicTruck {
   phone: string | null;

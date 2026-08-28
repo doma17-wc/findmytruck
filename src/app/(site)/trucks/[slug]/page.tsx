@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Globe, Music2, Navigation } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Globe, MapPin, Music2, Navigation } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { getTruckBySlug, getTruckPhotos, getTruckSchedule } from "@/lib/data";
 import { DAY_LABELS, DAY_LABELS_SHORT } from "@/lib/types";
 import { normalizeMenuItems } from "@/lib/menu";
+import { isUnclaimed, UNCLAIMED_BADGE } from "@/lib/unclaimed";
 import TruckMenu from "@/components/site/TruckMenu";
+import TruckPlaceholder from "@/components/site/TruckPlaceholder";
 import { formatTimeRange, getMondayFirstDay, isNowWithin } from "@/lib/geo";
 import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
 import FavoriteButton from "@/components/FavoriteButton";
@@ -75,6 +77,8 @@ export default async function TruckProfilePage({ params }: PageProps) {
   }
 
   const menuItems = normalizeMenuItems(truck.menu_items);
+  const unclaimed = isUnclaimed(truck);
+  const websiteUrl = truck.website ?? truck.source_website ?? null;
 
   const today = getMondayFirstDay();
   const todaySchedule = schedule.filter((s) => s.day_of_week === today);
@@ -132,9 +136,7 @@ export default async function TruckProfilePage({ params }: PageProps) {
             className="object-cover"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-neutral-800 to-neutral-950 text-6xl">
-            🚚
-          </div>
+          <TruckPlaceholder name={truck.name} />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-black/0 to-black/10" />
 
@@ -165,14 +167,23 @@ export default async function TruckProfilePage({ params }: PageProps) {
             <h1 className="text-2xl font-extrabold tracking-tight text-neutral-900 sm:text-3xl">
               {truck.name}
             </h1>
-            <span
-              className={`mt-1 flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
-                openNow ? "bg-green-100 text-green-700" : "bg-neutral-100 text-neutral-500"
-              }`}
-            >
-              {openNow ? "Open now" : "Closed"}
-            </span>
+            {!unclaimed && (
+              <span
+                className={`mt-1 flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
+                  openNow ? "bg-green-100 text-green-700" : "bg-neutral-100 text-neutral-500"
+                }`}
+              >
+                {openNow ? "Open now" : "Closed"}
+              </span>
+            )}
           </div>
+
+          {unclaimed && (
+            <p className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-medium text-neutral-500">
+              <MapPin className="h-3.5 w-3.5" />
+              {UNCLAIMED_BADGE}
+            </p>
+          )}
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
             {truck.cuisine_type.map((c) => (
@@ -234,9 +245,9 @@ export default async function TruckProfilePage({ params }: PageProps) {
                 <Music2 className="h-5 w-5" />
               </a>
             )}
-            {truck.website && (
+            {websiteUrl && (
               <a
-                href={truck.website.startsWith("http") ? truck.website : `https://${truck.website}`}
+                href={websiteUrl.startsWith("http") ? websiteUrl : `https://${websiteUrl}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex h-12 w-12 items-center justify-center rounded-xl border border-neutral-200 text-neutral-700 transition hover:border-brand hover:text-brand"
@@ -247,6 +258,40 @@ export default async function TruckProfilePage({ params }: PageProps) {
             )}
           </div>
 
+          {unclaimed && (
+            <div className="mt-6 rounded-2xl border border-brand-200 bg-brand-50 p-4">
+              <p className="text-sm font-bold text-neutral-900">Is this your truck?</p>
+              <p className="mt-1 text-sm text-neutral-600">
+                This profile was put together from public sources so people can find you. Claim it to
+                add your real schedule, menu, and photos.
+              </p>
+              <Link
+                href={`/claim/${truck.slug}`}
+                className="mt-3 inline-flex items-center gap-2 rounded-xl bg-brand px-4 py-2.5 text-sm font-bold text-white shadow-sm shadow-brand/30 transition hover:brightness-105 active:scale-[0.99]"
+              >
+                <BadgeCheck className="h-4 w-4" />
+                Claim your profile
+              </Link>
+            </div>
+          )}
+
+          {schedule.length === 0 ? (
+            <section className="mt-9">
+              <h2 className="text-lg font-bold text-neutral-900">Where to find them</h2>
+              <div className="mt-3 flex items-start gap-3 rounded-2xl border border-neutral-100 p-4 shadow-card">
+                <MapPin className="mt-0.5 h-5 w-5 flex-shrink-0 text-brand" />
+                <div className="text-sm text-neutral-700">
+                  <p className="font-semibold">
+                    {truck.source_region ?? "Location to be confirmed"}
+                  </p>
+                  <p className="mt-0.5 text-neutral-500">
+                    Home base from public data — exact spots and hours are added once the owner
+                    claims this profile.
+                  </p>
+                </div>
+              </div>
+            </section>
+          ) : (
           <section className="mt-9">
             <h2 className="text-lg font-bold text-neutral-900">Weekly schedule</h2>
             <div className="mt-3 overflow-hidden rounded-2xl border border-neutral-100 shadow-card">
@@ -285,6 +330,7 @@ export default async function TruckProfilePage({ params }: PageProps) {
               })}
             </div>
           </section>
+          )}
 
           {(menuItems.length > 0 || truck.menu_text || truck.menu_photo_url) && (
             <section className="mt-9">

@@ -4,7 +4,9 @@ import Image from "next/image";
 import Link from "next/link";
 import type { PublicTruck } from "@/lib/types";
 import { formatDistance, formatTimeRange, type TruckStatus } from "@/lib/geo";
+import { isUnclaimed } from "@/lib/unclaimed";
 import FavoriteButton from "@/components/FavoriteButton";
+import TruckPlaceholder from "@/components/site/TruckPlaceholder";
 
 interface TruckListItemProps {
   truck: PublicTruck;
@@ -32,6 +34,7 @@ export default function TruckListItem({
 }: TruckListItemProps) {
   const schedule = status.schedule!;
   const image = truck.cover_photo_url ?? truck.logo_url;
+  const unclaimed = isUnclaimed(truck);
 
   return (
     <button
@@ -48,14 +51,16 @@ export default function TruckListItem({
             sizes="(max-width: 640px) 100vw, 320px"
           />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-4xl">🚚</div>
+          <TruckPlaceholder name={truck.name} compact />
         )}
 
         <div className="absolute left-3 top-3">
           <span
-            className={`rounded-full px-2.5 py-1 text-xs font-bold shadow-sm ${BADGE_CLASSES[status.state]}`}
+            className={`rounded-full px-2.5 py-1 text-xs font-bold shadow-sm ${
+              unclaimed ? "bg-white/95 text-neutral-600" : BADGE_CLASSES[status.state]
+            }`}
           >
-            {status.label}
+            {unclaimed ? "Unclaimed" : status.label}
           </span>
         </div>
 
@@ -90,7 +95,10 @@ export default function TruckListItem({
         </div>
 
         <p className="mt-2.5 truncate text-sm text-neutral-500">
-          📍 {schedule.location_name} · {formatTimeRange(schedule.start_time, schedule.end_time)}
+          📍 {schedule.location_name}
+          {status.isRegionFallback
+            ? " · location to be confirmed"
+            : ` · ${formatTimeRange(schedule.start_time, schedule.end_time)}`}
         </p>
 
         <Link

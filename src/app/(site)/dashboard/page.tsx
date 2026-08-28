@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Eye, TrendingUp } from "lucide-react";
+import { Eye, TrendingUp, Clock } from "lucide-react";
 import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
 import type { Truck, TruckSchedule, TruckPhoto } from "@/lib/types";
 import DashboardTruckForm from "@/components/dashboard/DashboardTruckForm";
@@ -39,6 +39,17 @@ export default async function DashboardPage() {
     <div className="mx-auto max-w-3xl px-4 py-8 pb-16">
       <h1 className="text-2xl font-bold text-neutral-900">Truck dashboard</h1>
       <p className="mt-1 text-sm text-neutral-500">Manage {truck.name}&apos;s public profile.</p>
+
+      {(truck as Truck).claim_status === "pending" && (
+        <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <Clock className="mt-0.5 h-4 w-4 flex-shrink-0" />
+          <span>
+            Thanks for claiming {truck.name}! Your claim is <strong>awaiting verification</strong> by
+            our team. You can edit everything now — the profile shows a &ldquo;verified&rdquo; badge
+            once approved.
+          </span>
+        </div>
+      )}
 
       <div className="mt-6 grid grid-cols-2 gap-3">
         <div className="rounded-2xl border border-neutral-100 bg-white p-4 shadow-card">

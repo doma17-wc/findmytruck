@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { formatTimeRange } from "@/lib/geo";
+import { isUnclaimed } from "@/lib/unclaimed";
 import { DEFAULT_MAP_CENTER } from "@/lib/cities";
 import type { TruckStatusEntry } from "./HomeClient";
 
@@ -136,8 +137,29 @@ export default function TruckMap({
     trucks.forEach(({ truck, status }) => {
       const schedule = status.schedule!;
       const lngLat: [number, number] = [schedule.location_lng, schedule.location_lat];
-      const pinColor = PIN_COLORS[status.state];
-      const badgeColor = BADGE_COLORS[status.state];
+      const unclaimed = isUnclaimed(truck);
+      // Unclaimed profiles get an outlined grey pin; claimed trucks a solid
+      // status-coloured one.
+      const pinFill = unclaimed ? "#FFFFFF" : PIN_COLORS[status.state];
+      const pinBorder = unclaimed ? "#A3A3A3" : "#FFFFFF";
+      const iconOpacity = unclaimed ? "0.55" : "1";
+      const badgeColor = unclaimed ? "#737373" : BADGE_COLORS[status.state];
+      const badgeLabel = unclaimed ? "Unclaimed" : status.label;
+
+      const locationLine = status.isRegionFallback
+        ? `📍 ${escapeHtml(schedule.location_name)} · location to be confirmed`
+        : `📍 ${escapeHtml(schedule.location_name)}`;
+      const timeLine = status.isRegionFallback
+        ? ""
+        : `<div style="font-size: 13px; color: #333; margin-top: 2px;">🕒 ${escapeHtml(
+            formatTimeRange(schedule.start_time, schedule.end_time)
+          )}</div>`;
+      const claimLine = unclaimed
+        ? `<a href="/claim/${encodeURIComponent(truck.slug)}"
+             style="display:block; margin-top:6px; color:#CC5500; text-align:center; padding:6px 10px; border-radius:8px; font-weight:600; font-size:12px; text-decoration:none; border:1px solid #FFC599;">
+             Is this your truck? Claim it
+           </a>`
+        : "";
 
       const popupHtml = `
         <div style="font-family: 'Inter', system-ui, sans-serif; min-width: 220px;">
@@ -147,22 +169,21 @@ export default function TruckMap({
                 truck.name
               )}</span>
               <span style="font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 999px; color: white; background: ${badgeColor};">${escapeHtml(
-                status.label
+                badgeLabel
               )}</span>
             </div>
             <div style="font-size: 13px; color: #666; margin-top: 3px;">${escapeHtml(
               truck.cuisine_type.join(", ")
             )}</div>
             <div style="font-size: 13px; color: #333; margin-top: 8px; display:flex; align-items:center; gap:4px;">
-              📍 ${escapeHtml(schedule.location_name)}
+              ${locationLine}
             </div>
-            <div style="font-size: 13px; color: #333; margin-top: 2px;">
-              🕒 ${escapeHtml(formatTimeRange(schedule.start_time, schedule.end_time))}
-            </div>
+            ${timeLine}
             <a href="/trucks/${encodeURIComponent(truck.slug)}"
                style="display:block; margin-top:10px; background:#FF6A00; color:white; text-align:center; padding:8px 10px; border-radius:8px; font-weight:600; font-size:13px; text-decoration:none;">
               View profile
             </a>
+            ${claimLine}
           </div>
         </div>
       `;
@@ -174,17 +195,17 @@ export default function TruckMap({
         el.style.cssText = `
           width: 40px; height: 40px; border-radius: 50% 50% 50% 4px;
           transform: rotate(45deg);
-          background: ${pinColor};
-          border: 3px solid white;
+          background: ${pinFill};
+          border: 3px solid ${pinBorder};
           box-shadow: 0 3px 8px rgba(0,0,0,0.35);
           display: flex; align-items: center; justify-content: center;
           cursor: pointer; padding: 0;
         `;
         const inner = document.createElement("span");
         inner.textContent = "🚚";
-        inner.style.cssText = "display:block; transform: rotate(-45deg); font-size: 17px;";
+        inner.style.cssText = `display:block; transform: rotate(-45deg); font-size: 17px; opacity: ${iconOpacity};`;
         el.appendChild(inner);
-        if (status.state === "open") el.classList.add("pulse-ring");
+        if (!unclaimed && status.state === "open") el.classList.add("pulse-ring");
 
         const popup = new mapboxgl.Popup({ offset: 28, closeButton: true }).setHTML(popupHtml);
         popupsRef.current.set(truck.id, popup);
@@ -201,8 +222,11 @@ export default function TruckMap({
         marker.setLngLat(lngLat);
         marker.getPopup()?.setHTML(popupHtml);
         const el = marker.getElement();
-        el.style.background = pinColor;
-        el.classList.toggle("pulse-ring", status.state === "open");
+        el.style.background = pinFill;
+        el.style.borderColor = pinBorder;
+        const inner = el.firstElementChild as HTMLElement | null;
+        if (inner) inner.style.opacity = iconOpacity;
+        el.classList.toggle("pulse-ring", !unclaimed && status.state === "open");
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

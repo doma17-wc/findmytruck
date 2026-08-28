@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { Search } from "lucide-react";
 import type { TruckWithSchedules } from "@/lib/data";
 import { distanceKm, computeTruckStatus, type TruckStatus } from "@/lib/geo";
+import { regionFallbackStatus } from "@/lib/unclaimed";
 import { DEFAULT_MAP_CENTER } from "@/lib/cities";
 import TruckListItem from "./TruckListItem";
 
@@ -73,10 +74,15 @@ export default function HomeClient({ initialTrucks, signedIn, favoritedIds }: Ho
 
   const referencePoint = userLocation ?? DEFAULT_MAP_CENTER;
 
-  // Only trucks that have ever been scheduled somewhere can get a pin/card.
+  // A truck gets a pin/card if it has a real schedule OR (for imported unclaimed
+  // profiles) an approximate region centre to fall back to.
   const withStatus: TruckStatusEntry[] = useMemo(() => {
     return filteredTrucks
-      .map(({ truck, schedules }) => ({ truck, status: computeTruckStatus(schedules, now) }))
+      .map(({ truck, schedules }) => {
+        const status = computeTruckStatus(schedules, now);
+        if (status.schedule) return { truck, status };
+        return { truck, status: regionFallbackStatus(truck) ?? status };
+      })
       .filter((entry) => entry.status.schedule !== null);
   }, [filteredTrucks, now]);
 
