@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { ChevronDown, List, Map as MapIcon, Search, SlidersHorizontal } from "lucide-react";
 import type { TruckWithSchedules } from "@/lib/data";
@@ -66,14 +66,28 @@ export default function DiscoverClient({
     return () => clearInterval(id);
   }, []);
 
-  useEffect(() => {
-    if (!("geolocation" in navigator)) return setLocationDenied(true);
+  const requestLocation = useCallback(() => {
+    if (!("geolocation" in navigator)) {
+      setLocationDenied(true);
+      return;
+    }
     navigator.geolocation.getCurrentPosition(
-      (pos) => setUserLocation([pos.coords.longitude, pos.coords.latitude]),
-      () => setLocationDenied(true),
-      { enableHighAccuracy: true, timeout: 8000 }
+      (pos) => {
+        setUserLocation([pos.coords.longitude, pos.coords.latitude]);
+        setLocationDenied(false);
+      },
+      (err) => {
+        // Only a hard "no" hides the distance UI — a timeout just means we keep
+        // showing every truck and let the user retry via the recenter button.
+        if (err.code === err.PERMISSION_DENIED) setLocationDenied(true);
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 60000 }
     );
   }, []);
+
+  useEffect(() => {
+    requestLocation();
+  }, [requestLocation]);
 
   const allEntries = useMemo(
     () => buildEntries(initialTrucks, ratings, now),
@@ -308,6 +322,7 @@ export default function DiscoverClient({
             liveCount={liveCount}
             onHover={setHoveredId}
             onSelect={setSelectedId}
+            onRequestLocation={requestLocation}
           />
         </div>
 

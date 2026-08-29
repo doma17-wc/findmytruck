@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import mapboxgl from "mapbox-gl";
 import "mapbox-gl/dist/mapbox-gl.css";
 import { Crosshair, Locate } from "lucide-react";
@@ -9,6 +9,29 @@ import { DEFAULT_MAP_CENTER } from "@/lib/cities";
 import type { DiscoverEntry } from "./types";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
+
+/**
+ * Bounding box around the bulk of the pins, ignoring far outliers so the initial
+ * camera frames the main cluster instead of zooming out to the whole country.
+ * Keeps every pin within `maxKm` of the median point; falls back to all points
+ * if that would leave too few.
+ */
+function coreBounds(pts: [number, number][], maxKm = 40): mapboxgl.LngLatBounds {
+  const median = (xs: number[]) => {
+    const s = [...xs].sort((a, b) => a - b);
+    return s[Math.floor(s.length / 2)];
+  };
+  const cLng = median(pts.map((p) => p[0]));
+  const cLat = median(pts.map((p) => p[1]));
+  const km = ([lng, lat]: [number, number]) =>
+    Math.hypot((lat - cLat) * 111, (lng - cLng) * 111 * Math.cos((cLat * Math.PI) / 180));
+  const core = pts.filter((p) => km(p) <= maxKm);
+  const use = core.length >= Math.max(2, Math.ceil(pts.length * 0.5)) ? core : pts;
+  return use.reduce(
+    (b, p) => b.extend(p),
+    new mapboxgl.LngLatBounds(use[0], use[0])
+  );
+}
 
 const STATE_FILL: Record<string, string> = {
   open: "#22c55e",
@@ -34,6 +57,7 @@ interface DiscoverMapProps {
   liveCount: number;
   onHover: (id: string | null) => void;
   onSelect: (id: string) => void;
+  onRequestLocation?: () => void;
 }
 
 export default function DiscoverMap({
@@ -45,13 +69,20 @@ export default function DiscoverMap({
   liveCount,
   onHover,
   onSelect,
+  onRequestLocation,
 }: DiscoverMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
+  // The styled inner button for each pin. NB: this is a CHILD of the element
+  // Mapbox owns — never touch the marker's own element (Mapbox writes `transform`
+  // and its positioning classes onto it every frame; reassigning className there
+  // strips `.mapboxgl-marker` and the pins fall out of the map's coordinate space).
+  const pinElsRef = useRef<Map<string, HTMLButtonElement>>(new Map());
   const metaRef = useRef<Map<string, PinMeta>>(new Map());
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const didAutoFitRef = useRef(false);
+  const [mapReady, setMapReady] = useState(false);
 
   const hoveredRef = useRef(hoveredId);
   const selectedRef = useRef(selectedId);
@@ -70,6 +101,7 @@ export default function DiscoverMap({
     });
     map.addControl(new mapboxgl.NavigationControl({ showCompass: false }), "bottom-right");
     mapRef.current = map;
+    map.on("load", () => setMapReady(true));
 
     // Keep the canvas sized to its container (mobile map/list toggle, split resize)
     const ro = new ResizeObserver(() => map.resize());
@@ -80,7 +112,11 @@ export default function DiscoverMap({
       map.remove();
       mapRef.current = null;
       markersRef.current.clear();
+      pinElsRef.current.clear();
       metaRef.current.clear();
+      userMarkerRef.current = null;
+      didAutoFitRef.current = false;
+      setMapReady(false);
     };
   }, []);
 
@@ -100,7 +136,7 @@ export default function DiscoverMap({
         .addTo(map);
     }
     map.flyTo({ center: userLocation, zoom: 13.5 });
-  }, [userLocation]);
+  }, [userLocation, mapReady]);
 
   // Recenter when the city selector changes
   useEffect(() => {
@@ -119,6 +155,7 @@ export default function DiscoverMap({
       if (!nextIds.has(id)) {
         marker.remove();
         markersRef.current.delete(id);
+        pinElsRef.current.delete(id);
         metaRef.current.delete(id);
       }
     }
@@ -137,7 +174,11 @@ export default function DiscoverMap({
 
       let marker = markersRef.current.get(truck.id);
       if (!marker) {
+        // Mapbox owns `wrapper`: it sets positioning classes + a per-frame
+        // `transform` on it. All of our styling goes on the inner button.
+        const wrapper = document.createElement("div");
         const el = document.createElement("button");
+        el.type = "button";
         el.className = "fmt-pin";
         el.setAttribute("aria-label", `${truck.name} on map`);
         const inner = document.createElement("span");
@@ -149,31 +190,32 @@ export default function DiscoverMap({
         });
         el.addEventListener("mouseenter", () => onHover(truck.id));
         el.addEventListener("mouseleave", () => onHover(null));
+        wrapper.appendChild(el);
 
-        marker = new mapboxgl.Marker({ element: el }).setLngLat(coord).addTo(map);
+        marker = new mapboxgl.Marker({ element: wrapper }).setLngLat(coord).addTo(map);
         markersRef.current.set(truck.id, marker);
+        pinElsRef.current.set(truck.id, el);
       } else {
         marker.setLngLat(coord);
       }
       applyPinStyle(truck.id);
     });
 
-    // Frame all trucks on first load (only when the user has no location)
+    // Frame trucks on first load (only when the user has no location). Fit to the
+    // core cluster, not every far-flung pin — a couple of trucks near Interlaken
+    // or Basel would otherwise zoom the map so far out that the ~55 greater-Zürich
+    // pins collapse into an unreadable stack.
     if (!didAutoFitRef.current && !userLocation && !cityCenter && entries.length > 0) {
       didAutoFitRef.current = true;
       const pts = entries.map((e) => e.coord);
       if (pts.length === 1) {
         map.flyTo({ center: pts[0], zoom: 13 });
       } else {
-        const bounds = pts.reduce(
-          (b, p) => b.extend(p),
-          new mapboxgl.LngLatBounds(pts[0], pts[0])
-        );
-        map.fitBounds(bounds, { padding: 64, maxZoom: 14, duration: 600 });
+        map.fitBounds(coreBounds(pts), { padding: 64, maxZoom: 14, duration: 600 });
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries]);
+  }, [entries, mapReady]);
 
   // Re-style pins on hover / selection change
   useEffect(() => {
@@ -192,9 +234,9 @@ export default function DiscoverMap({
 
   function applyPinStyle(id: string) {
     const marker = markersRef.current.get(id);
+    const el = pinElsRef.current.get(id);
     const meta = metaRef.current.get(id);
-    if (!marker || !meta) return;
-    const el = marker.getElement();
+    if (!marker || !el || !meta) return;
     const selected = selectedRef.current === id;
     const hovered = hoveredRef.current === id;
 
@@ -205,7 +247,9 @@ export default function DiscoverMap({
     el.style.border = `3px solid ${selected ? "#FF6A00" : meta.border}`;
     const inner = el.firstElementChild as HTMLElement | null;
     if (inner) inner.style.opacity = meta.iconOpacity;
-    el.style.zIndex = selected ? "6" : hovered ? "4" : "1";
+    // z-index belongs on the Mapbox-owned wrapper so pins stack against each
+    // other; the wrapper's other styles (position, transform) are left alone.
+    marker.getElement().style.zIndex = selected ? "6" : hovered ? "4" : "1";
   }
 
   function recenter() {
@@ -215,17 +259,15 @@ export default function DiscoverMap({
       map.flyTo({ center: userLocation, zoom: 13.5, duration: 600 });
       return;
     }
+    // No fix yet — (re)ask the browser for it; fall back to framing all pins.
+    onRequestLocation?.();
     const pts = entries.map((e) => e.coord);
     if (pts.length === 0) return;
     if (pts.length === 1) {
       map.flyTo({ center: pts[0], zoom: 13, duration: 600 });
       return;
     }
-    const bounds = pts.reduce(
-      (b, p) => b.extend(p),
-      new mapboxgl.LngLatBounds(pts[0], pts[0])
-    );
-    map.fitBounds(bounds, { padding: 64, maxZoom: 14, duration: 600 });
+    map.fitBounds(coreBounds(pts), { padding: 64, maxZoom: 14, duration: 600 });
   }
 
   return (

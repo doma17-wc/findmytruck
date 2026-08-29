@@ -169,8 +169,11 @@ body {
   }
 }
 
-/* Map pin: teardrop marker used on the discovery map. */
+/* Map pin: teardrop marker used on the discovery map. Rendered as the INNER
+   child of a Mapbox marker wrapper — Mapbox positions the wrapper, this element
+   only ever carries our own rotation/scale, so its `transform` is safe. */
 .fmt-pin {
+  position: relative;
   width: 34px;
   height: 34px;
   border-radius: 50% 50% 50% 4px;
