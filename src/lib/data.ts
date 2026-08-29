@@ -58,7 +58,7 @@ export async function getAllTrucksWithSchedules(): Promise<TruckWithSchedules[]>
       )`;
   const baseCols = `
       id, slug, name, description, cuisine_type, price_range,
-      logo_url, cover_photo_url, menu_text, menu_photo_url,
+      logo_url, cover_photo_url, menu_text, menu_items, menu_photo_url,
       instagram, tiktok, website, languages,
       food_type, dietary_options, payment_methods, features,
       is_active, is_claimed, short_code, created_at, updated_at`;

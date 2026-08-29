@@ -15,14 +15,18 @@ export interface City {
 
 export const CITIES: Record<string, City> = {
   zurich: { slug: "zurich", name: "Zurich", center: [8.5417, 47.3769] },
+  zug: { slug: "zug", name: "Zug", center: [8.5154, 47.1662] },
+  lucerne: { slug: "lucerne", name: "Lucerne", center: [8.3093, 47.0502] },
   bern: { slug: "bern", name: "Bern", center: [7.4474, 46.948] },
   basel: { slug: "basel", name: "Basel", center: [7.5886, 47.5596] },
-  geneva: { slug: "geneva", name: "Geneva", center: [6.1432, 46.2044] },
-  lausanne: { slug: "lausanne", name: "Lausanne", center: [6.6323, 46.5197] },
-  lucerne: { slug: "lucerne", name: "Lucerne", center: [8.3093, 47.0502] },
   winterthur: { slug: "winterthur", name: "Winterthur", center: [8.7241, 47.5001] },
   "st-gallen": { slug: "st-gallen", name: "St. Gallen", center: [9.3767, 47.4245] },
+  lausanne: { slug: "lausanne", name: "Lausanne", center: [6.6323, 46.5197] },
+  geneva: { slug: "geneva", name: "Geneva", center: [6.1432, 46.2044] },
 };
+
+/** Cities in display order for pickers / browse chips. */
+export const CITY_LIST: City[] = Object.values(CITIES);
 
 /** Geographic center of Switzerland ([lng, lat]) — used as the map's fallback. */
 export const SWITZERLAND_CENTER: [number, number] = [8.2275, 46.8182];

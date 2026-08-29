@@ -105,3 +105,115 @@ body {
 .toast-in {
   animation: toast-in 0.18s ease-out;
 }
+
+/* ============ Discovery / split-view homepage ============ */
+
+/* Live beacon on truck cards + map pins: a soft expanding green ring. */
+@keyframes live-beacon {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.9;
+  }
+  70% {
+    transform: scale(2.6);
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.live-beacon::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: live-beacon 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Slide-over detail sheet */
+@keyframes scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+.scrim-in {
+  animation: scrim-in 0.2s ease-out;
+}
+.sheet-in {
+  animation: sheet-in 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (max-width: 640px) {
+  @keyframes sheet-in {
+    from {
+      opacity: 0;
+      transform: translateY(24px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+/* Map pin: teardrop marker used on the discovery map. */
+.fmt-pin {
+  width: 34px;
+  height: 34px;
+  border-radius: 50% 50% 50% 4px;
+  transform: rotate(45deg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: transform 0.16s ease, filter 0.16s ease, width 0.16s ease,
+    height 0.16s ease;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.32);
+}
+.fmt-pin > span {
+  transform: rotate(-45deg);
+  font-size: 15px;
+  line-height: 1;
+}
+.fmt-pin.is-hovered {
+  filter: brightness(1.05);
+  transform: rotate(45deg) scale(1.12);
+}
+.fmt-pin.is-selected {
+  width: 42px;
+  height: 42px;
+  z-index: 5;
+}
+.fmt-pin.is-live {
+  color: #16a34a;
+}
+.fmt-pin.is-live::before {
+  content: "";
+  position: absolute;
+  inset: -3px;
+  border-radius: 50% 50% 50% 4px;
+  box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.5);
+  animation: pin-live-pulse 2s ease-out infinite;
+}
+@keyframes pin-live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(22, 163, 74, 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 12px rgba(22, 163, 74, 0);
+  }
+}
