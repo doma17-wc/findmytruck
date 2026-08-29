@@ -10,7 +10,7 @@ import {
   addOwnPhotoAction,
   deleteOwnPhotoAction,
   reorderOwnPhotosAction,
-} from "@/app/(site)/dashboard/actions";
+} from "@/app/dashboard/actions";
 
 export default function DashboardPhotoUploader({
   truckId,

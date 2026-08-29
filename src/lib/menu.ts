@@ -9,6 +9,8 @@ export interface MenuItem {
   price: number | null;
   description: string | null;
   category: string | null;
+  /** Marked out of stock by the owner from the dashboard. Absent === false. */
+  sold_out?: boolean;
 }
 
 export interface MenuGroup {
@@ -48,8 +50,15 @@ export function normalizeMenuItems(raw: unknown): MenuItem[] {
         typeof o.description === "string" && o.description.trim() ? o.description.trim() : null;
       const category =
         typeof o.category === "string" && o.category.trim() ? o.category.trim() : null;
+      const sold_out = o.sold_out === true || o.sold_out === "true";
 
-      return { name: name.slice(0, 120), price, description: description?.slice(0, 300) ?? null, category: category?.slice(0, 60) ?? null };
+      return {
+        name: name.slice(0, 120),
+        price,
+        description: description?.slice(0, 300) ?? null,
+        category: category?.slice(0, 60) ?? null,
+        sold_out,
+      };
     })
     .filter((x): x is MenuItem => x !== null)
     .slice(0, 200);

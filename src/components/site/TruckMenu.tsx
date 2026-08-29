@@ -17,9 +17,16 @@ export default function TruckMenu({ items }: { items: MenuItem[] }) {
             {group.items.map((item, i) => {
               const price = formatChf(item.price);
               return (
-                <li key={i}>
+                <li key={i} className={item.sold_out ? "opacity-50" : ""}>
                   <div className="flex items-baseline gap-3">
-                    <span className="font-semibold text-neutral-900">{item.name}</span>
+                    <span className="font-semibold text-neutral-900">
+                      {item.name}
+                      {item.sold_out && (
+                        <span className="ml-2 rounded-full bg-neutral-100 px-2 py-0.5 align-middle text-[10px] font-bold uppercase tracking-wide text-neutral-500">
+                          Sold out
+                        </span>
+                      )}
+                    </span>
                     <span className="mx-1 min-w-[1rem] flex-1 translate-y-[-3px] border-b border-dotted border-neutral-200" />
                     {price && (
                       <span className="flex-shrink-0 text-sm font-medium tabular-nums text-neutral-600">

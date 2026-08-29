@@ -69,6 +69,17 @@ export interface TruckPhoto {
   sort_order: number;
 }
 
+export interface Review {
+  id: string;
+  truck_id: string;
+  user_id: string | null;
+  author_name: string;
+  rating: number;
+  text: string | null;
+  reply: string | null;
+  created_at: string;
+}
+
 export interface QrRedirect {
   short_code: string;
   truck_id: string | null;
