@@ -9,7 +9,7 @@ import { CITY_LIST, DEFAULT_MAP_CENTER, CITIES } from "@/lib/cities";
 import DiscoverHeader from "./DiscoverHeader";
 import TruckCard from "./TruckCard";
 import DetailSheet from "./DetailSheet";
-import { buildEntries, CUISINE_CHIPS, matchesCuisine } from "./helpers";
+import { buildEntries, CUISINE_CHIPS, isOpenNow, matchesCuisine } from "./helpers";
 import type { DiscoverEntry, SortKey, TruckRating } from "./types";
 import type { AppProfile } from "@/lib/supabase/server";
 
@@ -87,14 +87,14 @@ export default function DiscoverClient({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return allEntries.filter(({ truck, status }) => {
+    return allEntries.filter(({ truck, status, schedules }) => {
       if (
         q &&
         !truck.name.toLowerCase().includes(q) &&
         !truck.cuisine_type.some((c) => c.toLowerCase().includes(q))
       )
         return false;
-      if (openNowOnly && status.state !== "open") return false;
+      if (openNowOnly && !isOpenNow(schedules, now)) return false;
       if (cuisines.size > 0 && ![...cuisines].some((c) => matchesCuisine(truck.cuisine_type, c)))
         return false;
       if (cityCenter && status.schedule) {
@@ -108,7 +108,7 @@ export default function DiscoverClient({
       }
       return true;
     });
-  }, [allEntries, query, openNowOnly, cuisines, cityCenter]);
+  }, [allEntries, query, openNowOnly, cuisines, cityCenter, now]);
 
   const sorted = useMemo(() => {
     const withDist = filtered.map((e) => ({
