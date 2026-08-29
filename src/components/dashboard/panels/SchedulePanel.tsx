@@ -7,6 +7,7 @@ import { DAY_LABELS } from "@/lib/types";
 import { getMondayFirstDay } from "@/lib/geo";
 import { publishTourAction, type TourDayInput } from "@/app/dashboard/actions";
 import { Card, CardBody, useToast, cn } from "../ui";
+import LocationAutocomplete from "../LocationAutocomplete";
 
 interface DayState {
   location: string;
@@ -14,20 +15,17 @@ interface DayState {
   open: boolean;
   lat: number | null;
   lng: number | null;
-  initialLocation: string;
 }
 
 function buildDays(schedules: TruckSchedule[]): DayState[] {
   return Array.from({ length: 7 }, (_, day) => {
     const row = schedules.find((s) => !s.specific_date && s.day_of_week === day);
-    const location = row?.location_name ?? "";
     return {
-      location,
+      location: row?.location_name ?? "",
       time: row ? `${row.start_time.slice(0, 5)}-${row.end_time.slice(0, 5)}` : "11:00-14:00",
       open: Boolean(row),
       lat: row?.location_lat ?? null,
       lng: row?.location_lng ?? null,
-      initialLocation: location,
     };
   });
 }
@@ -42,24 +40,20 @@ export default function SchedulePanel({ schedules }: { schedules: TruckSchedule[
     setDays((prev) => prev.map((d, i) => (i === idx ? { ...d, ...p } : d)));
 
   const publish = () => {
-    const payload: TourDayInput[] = days.map((d, day) => {
-      const unchanged = d.location.trim() === d.initialLocation.trim() && d.initialLocation.trim() !== "";
-      return {
-        day,
-        location: d.location,
-        time: d.time,
-        open: d.open,
-        lat: unchanged ? d.lat : null,
-        lng: unchanged ? d.lng : null,
-      };
-    });
+    const payload: TourDayInput[] = days.map((d, day) => ({
+      day,
+      location: d.location,
+      time: d.time,
+      open: d.open,
+      // Coordinates from a picked suggestion (or an untouched saved row) travel
+      // straight through; a null pair tells the server to geocode the text.
+      lat: d.lat,
+      lng: d.lng,
+    }));
     startTransition(async () => {
       const res = await publishTourAction(payload);
       if (res.error) toast(res.error, "error");
-      else {
-        toast("Tour published");
-        setDays((prev) => prev.map((d) => ({ ...d, initialLocation: d.location })));
-      }
+      else toast("Tour published");
     });
   };
 
@@ -89,12 +83,23 @@ export default function SchedulePanel({ schedules }: { schedules: TruckSchedule[
                     {isToday && <span className="ml-1 text-[11px] font-semibold text-accent">· today</span>}
                   </span>
 
-                  <input
+                  <LocationAutocomplete
                     value={d.location}
-                    onChange={(e) => patch(idx, { location: e.target.value, open: e.target.value ? true : d.open })}
+                    onChange={(location) =>
+                      patch(idx, {
+                        location,
+                        // Manual edit invalidates any previously picked pin.
+                        lat: null,
+                        lng: null,
+                        open: location ? true : d.open,
+                      })
+                    }
+                    onPick={({ name, lat, lng }) =>
+                      patch(idx, { location: name, lat, lng, open: true })
+                    }
                     placeholder="Location (e.g. Europaallee)"
-                    disabled={!d.open}
-                    className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm outline-none focus:border-accent disabled:opacity-40"
+                    aria-label={`${label} location`}
+                    className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink outline-none focus:border-accent"
                   />
 
                   <input
