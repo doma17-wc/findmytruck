@@ -53,17 +53,63 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persist
 const CH_CENTRE = [46.9480, 7.8213]; // roughly Bern/Mittelland, where people are
 
 /**
+ * Real town centres that make up an agglomeration. A truck in a vague region
+ * ("Zürich-Region", "Kanton Zug", …) is assigned to one of these by a hash of
+ * its slug, then given a small offset around it — so 55 "Zürich-Region" trucks
+ * land in Winterthur / Uster / Dietikon / Wädenswil / … instead of piling into
+ * one 5 km disc over Zürich HB (which reads as a vertical stack once the map
+ * zooms out to fit the Interlaken / Basel / Luzern outliers).
+ */
+const AGGLO_ANCHORS = {
+  zurich: [
+    [47.3769, 8.5417], // Zürich centre
+    [47.4106, 8.5442], // Oerlikon
+    [47.3908, 8.4880], // Altstetten
+    [47.3145, 8.5274], // Adliswil
+    [47.3961, 8.4470], // Schlieren
+    [47.4013, 8.4001], // Dietikon
+    [47.4995, 8.7241], // Winterthur
+    [47.3475, 8.7183], // Uster
+    [47.3968, 8.6191], // Dübendorf
+    [47.3266, 8.6510], // Meilen
+    [47.2593, 8.5979], // Horgen
+    [47.2292, 8.6742], // Wädenswil
+    [47.4520, 8.5849], // Bülach / Kloten
+    [47.3230, 8.5145], // Kilchberg / Rüschlikon
+    [47.4184, 8.6540], // Volketswil
+  ],
+  zug: [
+    [47.1662, 8.5155], // Zug
+    [47.1955, 8.5297], // Baar
+    [47.1817, 8.4637], // Cham
+    [47.1968, 8.4879], // Steinhausen
+    [47.1447, 8.4310], // Rotkreuz
+    [47.1739, 8.4207], // Hünenberg
+    [47.1770, 8.5920], // Menzingen
+  ],
+  luzern: [
+    [47.0502, 8.3093], // Luzern
+    [47.0357, 8.2818], // Kriens
+    [47.0782, 8.2743], // Emmenbrücke
+    [47.0806, 8.3418], // Ebikon
+    [47.0169, 8.3092], // Horw
+    [47.0834, 8.2044], // Rothenburg
+  ],
+};
+
+/**
  * One entry per distinct `source_region` value currently in the DB.
- *   q      – Mapbox query (", Switzerland" + country=ch is appended)
- *   at     – explicit [lat, lng] centre (skips Mapbox entirely)
- *   radius – jitter radius in km (how far a truck may sit from the centre)
+ *   q       – Mapbox query (", Switzerland" + country=ch is appended)
+ *   at      – explicit [lat, lng] centre (skips Mapbox entirely)
+ *   anchors – key into AGGLO_ANCHORS; trucks fan out across those town centres
+ *   radius  – jitter radius in km around the (single or per-anchor) centre
  */
 const REGION_MAP = {
-  "Zürich-Region":               { q: "Zürich",      radius: 5.5 },
+  "Zürich-Region":               { anchors: "zurich", radius: 2.0 },
   "Zürich":                      { q: "Zürich",      radius: 4.0 },
-  "Grossraum Zürich":            { q: "Zürich",      radius: 7.0 },
-  "Zürich / Zentralschweiz":     { q: "Zürich",      radius: 5.5 },
-  "Zürich / CH":                 { q: "Zürich",      radius: 5.5 },
+  "Grossraum Zürich":            { anchors: "zurich", radius: 2.5 },
+  "Zürich / Zentralschweiz":     { anchors: "zurich", radius: 2.5 },
+  "Zürich / CH":                 { anchors: "zurich", radius: 2.5 },
   "Zürich (Europaallee)":        { at: [47.3782, 8.5391], radius: 1.2 },
   "Zürich (Küchenlabor)":        { q: "Zürich",      radius: 2.5 },
   "Zürich (Take Away)":          { q: "Zürich",      radius: 2.5 },
@@ -78,10 +124,10 @@ const REGION_MAP = {
   "Baar / Cham (ZG)":            { at: [47.1886, 8.4934], radius: 3.0 },
   "Cham (ZG)":                   { q: "Cham ZG",     radius: 1.5 },
   "Neuheim (ZG)":                { q: "Neuheim",     radius: 1.2 },
-  "Kanton Zug":                  { q: "Zug",         radius: 6.0 },
-  "Zug-Region":                  { q: "Zug",         radius: 5.0 },
-  "Luzern":                      { q: "Luzern",     radius: 3.5 },
-  "Luzern (Vierwaldstättersee)": { q: "Luzern",     radius: 3.5 },
+  "Kanton Zug":                  { anchors: "zug",   radius: 1.8 },
+  "Zug-Region":                  { anchors: "zug",   radius: 1.8 },
+  "Luzern":                      { anchors: "luzern", radius: 2.0 },
+  "Luzern (Vierwaldstättersee)": { anchors: "luzern", radius: 2.0 },
   "Sursee (LU)":                 { q: "Sursee",     radius: 1.5 },
   "Wauwil (LU)":                 { q: "Wauwil",     radius: 1.2 },
   "Berner Oberland":             { q: "Interlaken", radius: 12.0 },
@@ -118,6 +164,20 @@ const centreCache = new Map();
 async function regionCentre(region) {
   if (centreCache.has(region)) return centreCache.get(region);
   const rule = REGION_MAP[region] ?? DEFAULT_RULE;
+  const radius = rule.radius ?? DEFAULT_RULE.radius;
+
+  // Vague agglomeration -> a set of real town centres to fan trucks across.
+  if (rule.anchors && AGGLO_ANCHORS[rule.anchors]) {
+    const out = {
+      anchors: AGGLO_ANCHORS[rule.anchors],
+      centre: AGGLO_ANCHORS[rule.anchors][0],
+      radius,
+      source: `anchors:${rule.anchors} (${AGGLO_ANCHORS[rule.anchors].length} towns)`,
+    };
+    centreCache.set(region, out);
+    return out;
+  }
+
   let centre = rule.at ?? null;
   let source = rule.at ? "explicit" : null;
 
@@ -131,9 +191,14 @@ async function regionCentre(region) {
     centre = CH_CENTRE;
     source = "CH_CENTRE (fallback)";
   }
-  const out = { centre, radius: rule.radius ?? DEFAULT_RULE.radius, source };
+  const out = { centre, radius, source };
   centreCache.set(region, out);
   return out;
+}
+
+/** Pick one anchor town for a truck, deterministically from its slug. */
+function pickAnchor(anchors, seed) {
+  return anchors[Math.floor(hashUnit(seed, 0x27d4eb2f) * anchors.length) % anchors.length];
 }
 
 // --- deterministic per-truck offset, uniform inside a disc of `radiusKm` ------
@@ -190,10 +255,11 @@ async function main() {
 
   for (const t of targets) {
     const region = t.source_region;
-    const { centre, radius, source } = await regionCentre(region);
-    const [dLat, dLng] = offset(t.slug, radius, centre[0]);
-    const lat = Number((centre[0] + dLat).toFixed(6));
-    const lng = Number((centre[1] + dLng).toFixed(6));
+    const { centre, anchors, radius, source } = await regionCentre(region);
+    const base = anchors ? pickAnchor(anchors, t.slug) : centre;
+    const [dLat, dLng] = offset(t.slug, radius, base[0]);
+    const lat = Number((base[0] + dLat).toFixed(6));
+    const lng = Number((base[1] + dLng).toFixed(6));
 
     if (!perRegion.has(region)) perRegion.set(region, { centre, radius, source, n: 0, sample: [] });
     const rg = perRegion.get(region);
