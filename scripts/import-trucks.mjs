@@ -168,17 +168,41 @@ async function geocodeRegion(raw) {
   return coords;
 }
 
-/** Deterministic ~±1 km offset so many trucks in one region don't stack exactly. */
-function jitter(slug) {
-  let h = 2166136261;
-  for (let i = 0; i < slug.length; i++) {
-    h ^= slug.charCodeAt(i);
-    h = Math.imul(h, 16777619);
-  }
-  h >>>= 0;
-  const dLat = (((h % 1000) / 1000) - 0.5) * 0.014;
-  const dLng = ((((h >> 10) % 1000) / 1000) - 0.5) * 0.02;
+/**
+ * Deterministic per-slug offset, uniform inside a disc of `radiusKm` around the
+ * region centre, so many trucks sharing one region fan out into separate pins
+ * instead of stacking on a single point.
+ *
+ * NOTE: an earlier version used `h >> 10` on an unsigned 32-bit `h` that is
+ * frequently > 2^31 — JS `>>` is a *signed* shift, so half the trucks got a
+ * large negative longitude offset and the whole set collapsed into a column.
+ * scripts/regeocode-regions.mjs repairs the rows this created.
+ */
+function jitter(slug, radiusKm = 3) {
+  const draw = (salt) => {
+    let h = (2166136261 ^ salt) >>> 0;
+    for (let i = 0; i < slug.length; i++) {
+      h ^= slug.charCodeAt(i);
+      h = Math.imul(h, 16777619) >>> 0;
+    }
+    h ^= h >>> 15;
+    h = Math.imul(h, 2246822507) >>> 0;
+    h ^= h >>> 13;
+    return (h >>> 0) / 4294967296; // [0, 1)
+  };
+  const angle = draw(0x9e3779b9) * 2 * Math.PI;
+  const dist = Math.sqrt(draw(0x85ebca6b)) * radiusKm; // sqrt -> uniform in disc
+  const dLat = (dist / 111.32) * Math.cos(angle);
+  const dLng = (dist / (111.32 * Math.cos((CH_CENTRE[0] * Math.PI) / 180))) * Math.sin(angle);
   return [dLat, dLng];
+}
+
+/** How far (km) a truck may sit from its region centre, by region vagueness. */
+function jitterRadiusFor(region) {
+  const r = (region || "").toLowerCase();
+  if (/grossraum|kanton|region|zwischen|zentralschweiz|oberland|-region|\bch\b/.test(r)) return 6;
+  if (/zürich$|zürich\b|zug|luzern|winterthur/.test(r)) return 4;
+  return 1.5; // a named village
 }
 
 function makeShortCode(taken) {
@@ -233,7 +257,7 @@ async function main() {
       .filter(Boolean);
 
     const [baseLat, baseLng] = await geocodeRegion(region || "CH");
-    const [dLat, dLng] = jitter(slug);
+    const [dLat, dLng] = jitter(slug, jitterRadiusFor(region));
     const regionLat = Number((baseLat + dLat).toFixed(6));
     const regionLng = Number((baseLng + dLng).toFixed(6));
 
