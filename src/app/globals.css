@@ -169,6 +169,25 @@ body {
   }
 }
 
+/* "You are here" dot on the discovery map. */
+.fmt-user-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #2563eb;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.35);
+  position: relative;
+}
+.fmt-user-dot::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 9999px;
+  box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.4);
+  animation: pin-live-pulse 2.4s ease-out infinite;
+}
+
 /* Map pin: teardrop marker used on the discovery map. Rendered as the INNER
    child of a Mapbox marker wrapper — Mapbox positions the wrapper, this element
    only ever carries our own rotation/scale, so its `transform` is safe. */

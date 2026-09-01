@@ -120,22 +120,23 @@ export default function DiscoverMap({
     };
   }, []);
 
-  // User location dot
+  // User location dot — waits for the style to finish loading (flyTo before
+  // `load` is unreliable), then drops a "you are here" marker and recenters.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !userLocation) return;
+    if (!map || !mapReady || !userLocation) return;
 
     if (userMarkerRef.current) {
       userMarkerRef.current.setLngLat(userLocation);
     } else {
       const el = document.createElement("div");
-      el.style.cssText =
-        "width:16px;height:16px;border-radius:50%;background:#2563EB;border:3px solid white;box-shadow:0 0 0 2px rgba(37,99,235,0.35);";
+      el.className = "fmt-user-dot";
+      el.setAttribute("aria-label", "Your location");
       userMarkerRef.current = new mapboxgl.Marker({ element: el })
         .setLngLat(userLocation)
         .addTo(map);
     }
-    map.flyTo({ center: userLocation, zoom: 13.5 });
+    map.flyTo({ center: userLocation, zoom: 13.5, duration: 900, essential: true });
   }, [userLocation, mapReady]);
 
   // Recenter when the city selector changes
