@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { notifyTruckJoined } from "@/lib/email";
 
 export interface AuthFormState {
   error?: string;
@@ -78,11 +79,44 @@ export async function registerTruckOwnerAction(
     };
   }
 
-  const { error: rpcError } = await supabase.rpc("register_truck_owner", {
+  // Does a matching unclaimed profile already exist? If so, this registration
+  // is really a claim-by-name (see register_truck_owner in migration 0005).
+  const { data: existing } = await supabase
+    .from("public_trucks")
+    .select("id")
+    .ilike("name", truckName.replace(/[%_\\]/g, "\\$&"))
+    .eq("claim_status", "unclaimed")
+    .limit(1)
+    .maybeSingle();
+  const isClaim = Boolean(existing);
+
+  const { data: truckId, error: rpcError } = await supabase.rpc("register_truck_owner", {
     p_truck_name: truckName,
     p_display_name: truckName,
   });
   if (rpcError) return { error: rpcError.message };
+
+  // Non-blocking owner notification — a failure here must never break signup.
+  try {
+    let slug: string | null = null;
+    if (truckId) {
+      const { data: truck } = await supabase
+        .from("public_trucks")
+        .select("slug")
+        .eq("id", truckId)
+        .maybeSingle();
+      slug = truck?.slug ?? null;
+    }
+    await notifyTruckJoined({
+      kind: isClaim ? "claim" : "registration",
+      truckName,
+      slug,
+      ownerName: truckName,
+      ownerEmail: email,
+    });
+  } catch (err) {
+    console.error("[register-truck] notification failed:", err);
+  }
 
   revalidatePath("/", "layout");
   redirect("/dashboard");

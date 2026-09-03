@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { notifyTruckJoined } from "@/lib/email";
 
 export interface ClaimFormState {
   error?: string;
@@ -59,6 +60,23 @@ export async function claimTruckAction(
 
   const { error: rpcError } = await supabase.rpc("claim_truck", { p_slug: slug });
   if (rpcError) return { error: rpcError.message };
+
+  // Non-blocking owner notification — a failure here must never break the claim.
+  try {
+    const { data: truck } = await supabase
+      .from("public_trucks")
+      .select("name")
+      .eq("slug", slug)
+      .maybeSingle();
+    await notifyTruckJoined({
+      kind: "claim",
+      truckName: truck?.name ?? slug,
+      slug,
+      ownerEmail: user?.email ?? (email || null),
+    });
+  } catch (err) {
+    console.error("[claim] notification failed:", err);
+  }
 
   revalidatePath("/", "layout");
   revalidatePath(`/trucks/${slug}`);
