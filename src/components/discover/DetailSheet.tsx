@@ -22,7 +22,7 @@ import { formatTimeRange, getMondayFirstDay } from "@/lib/geo";
 import { isUnclaimed } from "@/lib/unclaimed";
 import type { DiscoverEntry } from "./types";
 import { RatingBadge } from "./Bits";
-import { dietaryPills, timeAgo } from "./helpers";
+import { dietaryPills } from "./helpers";
 
 interface DetailSheetProps {
   entry: DiscoverEntry;
@@ -45,7 +45,7 @@ export default function DetailSheet({
   favorited,
   onClose,
 }: DetailSheetProps) {
-  const { truck, status, schedules, rating, live, liveSince } = entry;
+  const { truck, status, schedules, rating } = entry;
   const unclaimed = isUnclaimed(truck);
   const menuItems = normalizeMenuItems(truck.menu_items);
   const pills = dietaryPills(truck.dietary_options ?? []);
@@ -53,7 +53,8 @@ export default function DetailSheet({
 
   const today = getMondayFirstDay(now);
   const activeSchedule = status.schedule;
-  const open = status.state === "open";
+  const boosted = status.tier === "boosted";
+  const available = status.tier !== "closed";
   const weekly = schedules.filter((s) => s.specific_date == null);
 
   const directionsUrl = activeSchedule
@@ -150,44 +151,55 @@ export default function DetailSheet({
             </div>
           )}
 
-          {/* Live status card */}
+          {/* Status card */}
           <div
             className={`mt-4 rounded-2xl border p-4 ${
-              open ? "border-live/30 bg-live/5" : "border-line bg-card"
+              boosted
+                ? "border-live/40 bg-live/5"
+                : status.tier === "open"
+                ? "border-green-500/25 bg-green-50"
+                : "border-line bg-card"
             }`}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <span
                 className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide ${
-                  open ? "bg-live text-white" : "bg-neutral-200 text-neutral-600"
+                  boosted
+                    ? "bg-live text-white"
+                    : status.tier === "open"
+                    ? "bg-green-100 text-green-700 ring-1 ring-inset ring-green-500/25"
+                    : "bg-neutral-200 text-neutral-600"
                 }`}
               >
-                {open && (
+                {boosted && (
                   <span className="relative flex h-1.5 w-1.5 text-white">
                     <span className="live-beacon absolute inset-0" />
                     <span className="relative h-1.5 w-1.5 rounded-full bg-current" />
                   </span>
                 )}
-                {open ? (live ? "Live now" : "Open now") : status.label}
+                {status.label}
               </span>
-              {open && activeSchedule && (
+              {available && status.openUntil && (
                 <span className="text-[13px] text-ink-soft">
-                  Serving until {activeSchedule.end_time.slice(0, 5)}
+                  Serving until {status.openUntil}
                 </span>
               )}
+              {!available && status.detail && (
+                <span className="text-[13px] text-ink-soft">{status.detail}</span>
+              )}
             </div>
+
+            {boosted && (
+              <p className="mt-1.5 text-[12px] font-semibold text-live">
+                ● {status.detail}
+              </p>
+            )}
 
             {activeSchedule && (
               <p className="mt-2.5 flex items-start gap-1.5 text-[13px] text-ink-soft">
                 <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-brand" />
                 {activeSchedule.location_name}
                 {status.isRegionFallback && " · exact spot to be confirmed"}
-              </p>
-            )}
-
-            {live && liveSince && (
-              <p className="mt-1.5 text-[12px] font-semibold text-live">
-                ● Confirmed live {timeAgo(liveSince, now)}
               </p>
             )}
 

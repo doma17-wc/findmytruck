@@ -1,18 +1,16 @@
 "use client";
 
 import Image from "next/image";
-import { Radio } from "lucide-react";
+import { Zap } from "lucide-react";
 import { formatDistance } from "@/lib/geo";
 import { isUnclaimed } from "@/lib/unclaimed";
 import FavoriteButton from "@/components/FavoriteButton";
 import TruckPlaceholder from "@/components/site/TruckPlaceholder";
 import type { DiscoverEntry } from "./types";
 import { RatingBadge, StatusPill } from "./Bits";
-import { timeAgo } from "./helpers";
 
 interface BrowseCardProps {
   entry: DiscoverEntry;
-  now: Date;
   signedIn: boolean;
   favorited: boolean;
   distanceKm: number | null;
@@ -22,15 +20,15 @@ interface BrowseCardProps {
 /** Vertical truck card for the "Browse all food trucks" grid. */
 export default function BrowseCard({
   entry,
-  now,
   signedIn,
   favorited,
   distanceKm,
   onSelect,
 }: BrowseCardProps) {
-  const { truck, status, rating, live, liveSince } = entry;
+  const { truck, status, rating } = entry;
   const image = truck.cover_photo_url ?? truck.logo_url;
   const unclaimed = isUnclaimed(truck);
+  const boosted = status.tier === "boosted";
   const cityLine =
     status.schedule?.location_name ?? truck.source_region ?? "Location to be confirmed";
 
@@ -56,7 +54,7 @@ export default function BrowseCard({
             <TruckPlaceholder name={truck.name} compact />
           )}
           <div className="absolute left-2.5 top-2.5">
-            <StatusPill status={status} live={live} unclaimed={unclaimed} />
+            <StatusPill status={status} unclaimed={unclaimed} />
           </div>
         </div>
 
@@ -86,16 +84,18 @@ export default function BrowseCard({
           </p>
 
           <div className="mt-auto flex items-center justify-between gap-2 pt-2.5">
-            {live && liveSince ? (
-              <span className="inline-flex items-center gap-1 text-[12px] font-semibold text-live">
-                <Radio className="h-3.5 w-3.5" />
-                Live {timeAgo(liveSince, now)}
-              </span>
-            ) : (
-              <span className="text-[12px] font-medium text-muted">
-                {status.state === "open" ? "Open now" : status.label}
-              </span>
-            )}
+            <span
+              className={`inline-flex items-center gap-1 text-[12px] font-semibold ${
+                boosted
+                  ? "text-live"
+                  : status.tier === "open"
+                  ? "text-green-600"
+                  : "font-medium text-muted"
+              }`}
+            >
+              {boosted && <Zap className="h-3.5 w-3.5" fill="currentColor" />}
+              {status.detail ?? status.label}
+            </span>
             {distanceKm !== null && (
               <span className="font-mono text-[12px] text-muted">
                 {formatDistance(distanceKm)} away

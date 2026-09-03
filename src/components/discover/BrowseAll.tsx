@@ -2,11 +2,14 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, LocateFixed, MapPin, SlidersHorizontal } from "lucide-react";
-import { distanceKm } from "@/lib/geo";
+import { distanceKm, type TruckTier } from "@/lib/geo";
 import BrowseCard from "./BrowseCard";
-import { CUISINE_CHIPS, isOpenNow, matchesCuisine } from "./helpers";
+import { CUISINE_CHIPS, matchesCuisine } from "./helpers";
 import type { DiscoverEntry } from "./types";
 import type { GeoStatus } from "./useGeolocation";
+
+/** Boosted trucks first, then open-by-schedule, then closed. */
+const TIER_PRIORITY: Record<TruckTier, number> = { boosted: 0, open: 1, closed: 2 };
 
 type StatusFilter = "all" | "open" | "closed";
 type BrowseSort = "distance" | "rating" | "name" | "recent";
@@ -29,7 +32,6 @@ const DISTANCE_OPTIONS: { value: DistanceFilter; label: string }[] = [
 
 interface BrowseAllProps {
   entries: DiscoverEntry[];
-  now: Date;
   signedIn: boolean;
   favoritedSet: Set<string>;
   userLocation: [number, number] | null;
@@ -40,7 +42,6 @@ interface BrowseAllProps {
 
 export default function BrowseAll({
   entries,
-  now,
   signedIn,
   favoritedSet,
   userLocation,
@@ -76,9 +77,9 @@ export default function BrowseAll({
 
   const filtered = useMemo(() => {
     return withDist.filter(({ entry, dist }) => {
-      const open = isOpenNow(entry.schedules, now);
-      if (statusFilter === "open" && !open) return false;
-      if (statusFilter === "closed" && open) return false;
+      const available = entry.status.tier !== "closed";
+      if (statusFilter === "open" && !available) return false;
+      if (statusFilter === "closed" && available) return false;
       if (
         cuisines.size > 0 &&
         ![...cuisines].some((c) => matchesCuisine(entry.truck.cuisine_type, c))
@@ -87,11 +88,16 @@ export default function BrowseAll({
       if (hasLocation && distance > 0 && (dist === null || dist > distance)) return false;
       return true;
     });
-  }, [withDist, statusFilter, cuisines, distance, hasLocation, now]);
+  }, [withDist, statusFilter, cuisines, distance, hasLocation]);
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
     arr.sort((a, b) => {
+      // Tier always wins: Boosted → Open → Closed. The chosen sort orders within.
+      const pa = TIER_PRIORITY[a.entry.status.tier];
+      const pb = TIER_PRIORITY[b.entry.status.tier];
+      if (pa !== pb) return pa - pb;
+
       if (sort === "name") return a.entry.truck.name.localeCompare(b.entry.truck.name);
       if (sort === "recent") {
         return (b.entry.truck.updated_at ?? "").localeCompare(a.entry.truck.updated_at ?? "");
@@ -253,7 +259,6 @@ export default function BrowseAll({
               <BrowseCard
                 key={entry.truck.id}
                 entry={entry}
-                now={now}
                 signedIn={signedIn}
                 favorited={favoritedSet.has(entry.truck.id)}
                 distanceKm={hasLocation ? dist : null}

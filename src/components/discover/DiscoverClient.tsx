@@ -17,8 +17,9 @@ import DiscoverHeader from "./DiscoverHeader";
 import TruckCard from "./TruckCard";
 import DetailSheet from "./DetailSheet";
 import BrowseAll from "./BrowseAll";
-import { buildEntries, CUISINE_CHIPS, isOpenNow, matchesCuisine } from "./helpers";
-import type { DiscoverEntry, SortKey, TruckRating } from "./types";
+import { buildEntries, CUISINE_CHIPS, matchesCuisine } from "./helpers";
+import type { SortKey, TruckRating } from "./types";
+import type { TruckTier } from "@/lib/geo";
 import { useGeolocation } from "./useGeolocation";
 import type { AppProfile } from "@/lib/supabase/server";
 
@@ -31,11 +32,11 @@ const DiscoverMap = dynamic(() => import("./DiscoverMap"), {
   ),
 });
 
-const STATE_PRIORITY: Record<DiscoverEntry["status"]["state"], number> = {
-  open: 0,
-  opens_today: 1,
-  next_day: 2,
-  none: 3,
+/** Boosted trucks first, then open-by-schedule, then closed. */
+const TIER_PRIORITY: Record<TruckTier, number> = {
+  boosted: 0,
+  open: 1,
+  closed: 2,
 };
 
 interface DiscoverClientProps {
@@ -99,14 +100,14 @@ export default function DiscoverClient({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return allEntries.filter(({ truck, status, schedules }) => {
+    return allEntries.filter(({ truck, status }) => {
       if (
         q &&
         !truck.name.toLowerCase().includes(q) &&
         !truck.cuisine_type.some((c) => c.toLowerCase().includes(q))
       )
         return false;
-      if (openNowOnly && !isOpenNow(schedules, now)) return false;
+      if (openNowOnly && status.tier === "closed") return false;
       if (cuisines.size > 0 && ![...cuisines].some((c) => matchesCuisine(truck.cuisine_type, c)))
         return false;
       if (cityCenter && status.schedule) {
@@ -128,6 +129,11 @@ export default function DiscoverClient({
       dist: distanceKm(referencePoint[1], referencePoint[0], e.coord[1], e.coord[0]),
     }));
     withDist.sort((a, b) => {
+      // Tier always wins: Boosted → Open → Closed. The chosen sort orders within.
+      const pa = TIER_PRIORITY[a.entry.status.tier];
+      const pb = TIER_PRIORITY[b.entry.status.tier];
+      if (pa !== pb) return pa - pb;
+
       if (sort === "name") return a.entry.truck.name.localeCompare(b.entry.truck.name);
       if (sort === "rating") {
         const ra = a.entry.rating?.avg ?? -1;
@@ -135,16 +141,12 @@ export default function DiscoverClient({
         if (rb !== ra) return rb - ra;
         return (b.entry.rating?.count ?? 0) - (a.entry.rating?.count ?? 0);
       }
-      // distance — but keep open/soon trucks grouped ahead
-      const pa = STATE_PRIORITY[a.entry.status.state];
-      const pb = STATE_PRIORITY[b.entry.status.state];
-      if (pa !== pb) return pa - pb;
       return a.dist - b.dist;
     });
     return withDist;
   }, [filtered, referencePoint, sort]);
 
-  const liveCount = allEntries.filter((e) => e.live).length;
+  const boostedCount = allEntries.filter((e) => e.status.tier === "boosted").length;
   const selectedEntry = selectedId
     ? allEntries.find((e) => e.truck.id === selectedId) ?? null
     : null;
@@ -300,13 +302,13 @@ export default function DiscoverClient({
                 {sorted.length} truck{sorted.length === 1 ? "" : "s"}
                 {citySlug && ` near ${CITIES[citySlug]?.name}`}
               </p>
-              {liveCount > 0 && (
+              {boostedCount > 0 && (
                 <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-live">
                   <span className="relative flex h-1.5 w-1.5 text-live">
                     <span className="live-beacon absolute inset-0" />
                     <span className="relative h-1.5 w-1.5 rounded-full bg-current" />
                   </span>
-                  {liveCount} live
+                  {boostedCount} boosted
                 </span>
               )}
             </div>
@@ -331,7 +333,6 @@ export default function DiscoverClient({
                   <TruckCard
                     key={entry.truck.id}
                     entry={entry}
-                    now={now}
                     signedIn={signedIn}
                     favorited={favoritedSet.has(entry.truck.id)}
                     selected={selectedId === entry.truck.id}
@@ -359,7 +360,7 @@ export default function DiscoverClient({
               cityCenter={cityCenter}
               hoveredId={hoveredId}
               selectedId={selectedId}
-              liveCount={liveCount}
+              boostedCount={boostedCount}
               onHover={setHoveredId}
               onSelect={setSelectedId}
               onRequestLocation={requestLocation}
@@ -397,7 +398,6 @@ export default function DiscoverClient({
       {/* ---------- Below the fold: full browsable directory ---------- */}
       <BrowseAll
         entries={allEntries}
-        now={now}
         signedIn={signedIn}
         favoritedSet={favoritedSet}
         userLocation={userLocation}

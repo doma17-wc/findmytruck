@@ -37,6 +37,13 @@ export interface PublicTruck {
   /** Approx. home-base coordinates for trucks with no schedule yet. */
   region_lat?: number | null;
   region_lng?: number | null;
+  /** Boost system (migration 0007). "Boosted" = boosted && now < boost_expires_at,
+   *  computed on read. May be absent on rows read before that migration. */
+  boosted?: boolean | null;
+  boost_expires_at?: string | null;
+  boost_started_at?: string | null;
+  boost_lat?: number | null;
+  boost_lng?: number | null;
 }
 
 export type ClaimStatus = "unclaimed" | "pending" | "claimed";

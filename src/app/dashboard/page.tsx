@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
 import type { Truck, TruckSchedule, TruckPhoto, Review } from "@/lib/types";
 import { normalizeMenuItems } from "@/lib/menu";
-import { getMondayFirstDay } from "@/lib/geo";
+import { getMondayFirstDay, readBoost, isBoostActive } from "@/lib/geo";
 import DashboardApp, { type DashboardStats } from "@/components/dashboard/DashboardApp";
 
 export const metadata = { title: "Dashboard" };
@@ -107,7 +107,8 @@ export default async function DashboardPage() {
       ? Math.round((reviewList.reduce((s, r) => s + r.rating, 0) / reviewList.length) * 10) / 10
       : 0;
 
-  const liveRow = ((schedules ?? []) as TruckSchedule[]).find((s) => s.specific_date != null) ?? null;
+  const boost = readBoost(truck as Truck);
+  const boosted = isBoostActive(boost, now);
 
   const stats: DashboardStats = {
     viewsToday,
@@ -127,7 +128,9 @@ export default async function DashboardPage() {
       schedules={(schedules ?? []) as TruckSchedule[]}
       photos={(photos ?? []) as TruckPhoto[]}
       reviews={reviewList}
-      liveRow={liveRow}
+      boosted={boosted}
+      boostExpiresAt={boost.expiresAt ? boost.expiresAt.toISOString() : null}
+      boostStartedAt={boost.startedAt ? boost.startedAt.toISOString() : null}
       stats={stats}
       ownerName={auth.profile.display_name ?? null}
     />

@@ -194,71 +194,90 @@ export async function publishTourAction(days: TourDayInput[]): Promise<ActionRes
 }
 
 /* ------------------------------------------------------------------ *
- * GO LIVE  (is_active + a today-only truck_schedules row)
+ * BOOST  (trucks.boosted + boost_expires_at, optional GPS pin)
+ *
+ * Boosting pushes the truck to the top of the map and marks it "confirmed live
+ * right now". It auto-expires at the end of today's scheduled slot (or in 4h if
+ * there's no active slot) — "boosted" is re-checked on read, so no cron needed.
  * ------------------------------------------------------------------ */
 
-export interface GoLiveInput {
-  locationName: string;
-  lat: number;
-  lng: number;
-  servingUntil: string; // "HH:MM"
+const FOUR_HOURS_MS = 4 * 60 * 60 * 1000;
+
+export interface BoostInput {
+  /** Optional GPS captured with the owner's permission to refine the pin. */
+  lat: number | null;
+  lng: number | null;
 }
 
-export async function goLiveAction(input: GoLiveInput): Promise<ActionResult> {
+export async function boostAction(input: BoostInput): Promise<ActionResult> {
   const truckId = await requireOwnTruckId();
   const supabase = createClient();
 
-  const name = (input.locationName ?? "").trim() || "Current location";
-  if (!Number.isFinite(input.lat) || !Number.isFinite(input.lng)) {
-    return { error: "Missing location coordinates." };
+  const now = new Date();
+
+  // Expiry = end of today's active recurring slot, else +4h.
+  const { data: rows } = await supabase
+    .from("truck_schedules")
+    .select("day_of_week, start_time, end_time, specific_date")
+    .eq("truck_id", truckId)
+    .is("specific_date", null);
+
+  const todayIdx = getMondayFirstDay(now);
+  const nowMin = now.getHours() * 60 + now.getMinutes();
+  const toMin = (t: string) => {
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  };
+  const active = (rows ?? []).find(
+    (s) =>
+      s.day_of_week === todayIdx &&
+      s.start_time !== s.end_time &&
+      nowMin >= toMin(s.start_time) &&
+      nowMin <= toMin(s.end_time)
+  );
+
+  let expires = new Date(now.getTime() + FOUR_HOURS_MS);
+  if (active) {
+    const [h, m] = active.end_time.split(":").map(Number);
+    const slotEnd = new Date(now);
+    slotEnd.setHours(h || 0, m || 0, 0, 0);
+    if (slotEnd > now) expires = slotEnd;
   }
 
-  const now = new Date();
-  const start = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
-  const end = /^\d{2}:\d{2}/.test(input.servingUntil) ? input.servingUntil.slice(0, 5) : "23:59";
-  const today = now.toISOString().slice(0, 10);
+  const lat = typeof input.lat === "number" && Number.isFinite(input.lat) ? input.lat : null;
+  const lng = typeof input.lng === "number" && Number.isFinite(input.lng) ? input.lng : null;
 
-  await supabase
-    .from("truck_schedules")
-    .delete()
-    .eq("truck_id", truckId)
-    .not("specific_date", "is", null);
-
-  const { error } = await supabase.from("truck_schedules").insert({
-    truck_id: truckId,
-    day_of_week: getMondayFirstDay(now),
-    location_name: name,
-    location_lat: input.lat,
-    location_lng: input.lng,
-    start_time: start,
-    end_time: end,
-    is_recurring: false,
-    specific_date: today,
-    notes: "live",
-  });
-  if (error) return { error: error.message };
-
-  const { error: activeError } = await supabase
+  const { error } = await supabase
     .from("trucks")
-    .update({ is_active: true })
+    .update({
+      boosted: true,
+      boost_started_at: now.toISOString(),
+      boost_expires_at: expires.toISOString(),
+      boost_lat: lat,
+      boost_lng: lng,
+      is_active: true,
+    })
     .eq("id", truckId);
-  if (activeError) return { error: activeError.message };
+  if (error) return { error: error.message };
 
   revalidateEverywhere();
   return { success: true };
 }
 
-export async function endServiceAction(): Promise<ActionResult> {
+export async function endBoostAction(): Promise<ActionResult> {
   const truckId = await requireOwnTruckId();
   const supabase = createClient();
 
-  await supabase
-    .from("truck_schedules")
-    .delete()
-    .eq("truck_id", truckId)
-    .not("specific_date", "is", null);
-
-  const { error } = await supabase.from("trucks").update({ is_active: false }).eq("id", truckId);
+  const { error } = await supabase
+    .from("trucks")
+    .update({
+      boosted: false,
+      boost_expires_at: null,
+      boost_started_at: null,
+      boost_lat: null,
+      boost_lng: null,
+    })
+    .eq("id", truckId);
   if (error) return { error: error.message };
 
   revalidateEverywhere();

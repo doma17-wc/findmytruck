@@ -33,17 +33,16 @@ function coreBounds(pts: [number, number][], maxKm = 40): mapboxgl.LngLatBounds 
   );
 }
 
-const STATE_FILL: Record<string, string> = {
-  open: "#22c55e",
-  opens_today: "#FF6A00",
-  next_day: "#A3A3A3",
-  none: "#A3A3A3",
+const TIER_FILL: Record<string, string> = {
+  boosted: "#16a34a", // bright green
+  open: "#86efac", // soft green
+  closed: "#A3A3A3", // grey
 };
 
 interface PinMeta {
   fill: string;
   border: string;
-  live: boolean;
+  boosted: boolean;
   unclaimed: boolean;
   iconOpacity: string;
 }
@@ -54,7 +53,7 @@ interface DiscoverMapProps {
   cityCenter: [number, number] | null;
   hoveredId: string | null;
   selectedId: string | null;
-  liveCount: number;
+  boostedCount: number;
   onHover: (id: string | null) => void;
   onSelect: (id: string) => void;
   onRequestLocation?: () => void;
@@ -66,7 +65,7 @@ export default function DiscoverMap({
   cityCenter,
   hoveredId,
   selectedId,
-  liveCount,
+  boostedCount,
   onHover,
   onSelect,
   onRequestLocation,
@@ -162,12 +161,13 @@ export default function DiscoverMap({
     }
 
     entries.forEach((entry) => {
-      const { truck, status, coord, live } = entry;
+      const { truck, status, coord } = entry;
       const unclaimed = isUnclaimed(truck);
+      const boosted = status.tier === "boosted";
       const meta: PinMeta = {
-        fill: unclaimed ? "#FFFFFF" : STATE_FILL[status.state] ?? "#A3A3A3",
-        border: live ? "#16A34A" : unclaimed ? "#A3A3A3" : "#FFFFFF",
-        live,
+        fill: unclaimed ? "#FFFFFF" : TIER_FILL[status.tier] ?? "#A3A3A3",
+        border: boosted ? "#15803d" : unclaimed ? "#A3A3A3" : "#FFFFFF",
+        boosted,
         unclaimed,
         iconOpacity: unclaimed ? "0.55" : "1",
       };
@@ -241,7 +241,7 @@ export default function DiscoverMap({
     const selected = selectedRef.current === id;
     const hovered = hoveredRef.current === id;
 
-    el.className = `fmt-pin${meta.live ? " is-live" : ""}${
+    el.className = `fmt-pin${meta.boosted ? " is-boosted" : ""}${
       hovered ? " is-hovered" : ""
     }${selected ? " is-selected" : ""}`;
     el.style.background = selected ? "#FF6A00" : meta.fill;
@@ -275,13 +275,13 @@ export default function DiscoverMap({
     <div className="relative h-full w-full">
       <div ref={containerRef} className="h-full w-full" />
 
-      {liveCount > 0 && (
+      {boostedCount > 0 && (
         <div className="pointer-events-none absolute left-3 top-3 z-10 inline-flex items-center gap-2 rounded-full bg-ink/90 px-3 py-1.5 text-xs font-bold text-white shadow-lg backdrop-blur-sm">
           <span className="relative flex h-2 w-2 text-green-400">
             <span className="live-beacon absolute inset-0" />
             <span className="relative h-2 w-2 rounded-full bg-current" />
           </span>
-          {liveCount} truck{liveCount === 1 ? "" : "s"} live now
+          {boostedCount} truck{boostedCount === 1 ? "" : "s"} boosted now
         </div>
       )}
 

@@ -1,16 +1,18 @@
 "use client";
 
-import { Eye, Users, UtensilsCrossed, Radio, ArrowRight } from "lucide-react";
-import type { Truck, TruckSchedule } from "@/lib/types";
+import { Eye, Users, UtensilsCrossed, Zap, ArrowRight } from "lucide-react";
+import type { Truck } from "@/lib/types";
 import { Card, CardBody, BarChart } from "../ui";
-import LiveHero from "../LiveHero";
+import BoostHero from "../BoostHero";
 import type { DashboardStats } from "../DashboardApp";
 
 interface Props {
   truck: Truck;
-  liveRow: TruckSchedule | null;
+  boosted: boolean;
+  boostExpiresAt: string | null;
+  boostStartedAt: string | null;
   stats: DashboardStats;
-  onNavigate: (key: "golive" | "menu" | "schedule" | "reviews" | "insights" | "settings") => void;
+  onNavigate: (key: "boost" | "menu" | "schedule" | "reviews" | "insights" | "settings") => void;
 }
 
 function Kpi({
@@ -35,9 +37,14 @@ function Kpi({
   );
 }
 
-export default function OverviewPanel({ truck, liveRow, stats, onNavigate }: Props) {
-  const live = Boolean(liveRow);
-
+export default function OverviewPanel({
+  truck,
+  boosted,
+  boostExpiresAt,
+  boostStartedAt,
+  stats,
+  onNavigate,
+}: Props) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -45,22 +52,22 @@ export default function OverviewPanel({ truck, liveRow, stats, onNavigate }: Pro
         <Kpi icon={Users} label="Followers" value={stats.followers} />
         <Kpi icon={UtensilsCrossed} label="Menu items" value={stats.menuItemCount} />
         <Kpi
-          icon={Radio}
-          label="Live status"
-          value={live ? "Live" : truck.is_active ? "Listed" : "Off"}
+          icon={Zap}
+          label="Status"
+          value={boosted ? "Boosted" : truck.is_active ? "Listed" : "Off"}
         />
       </div>
 
-      <LiveHero live={live} liveRow={liveRow}>
+      <BoostHero boosted={boosted} startedAt={boostStartedAt} expiresAt={boostExpiresAt}>
         <button
           type="button"
-          onClick={() => onNavigate("golive")}
+          onClick={() => onNavigate("boost")}
           className="inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-ink transition hover:bg-white/90"
         >
-          {live ? "Manage service" : "Go live now"}
+          {boosted ? "Manage boost" : "Boost now"}
           <ArrowRight className="h-4 w-4" />
         </button>
-      </LiveHero>
+      </BoostHero>
 
       <Card>
         <CardBody>

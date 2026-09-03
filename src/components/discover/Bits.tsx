@@ -31,13 +31,17 @@ export function RatingBadge({
 
 interface StatusPillProps {
   status: TruckStatus;
-  live?: boolean;
   unclaimed?: boolean;
   className?: string;
 }
 
-/** OPEN NOW (green, pulsing beacon) / Closed (grey) / Opens at 11:30. */
-export function StatusPill({ status, live, unclaimed, className = "" }: StatusPillProps) {
+/**
+ * The three-tier status badge:
+ *   Boosted — bright green, pulsing beacon
+ *   Open    — soft green, no animation
+ *   Closed  — grey
+ */
+export function StatusPill({ status, unclaimed, className = "" }: StatusPillProps) {
   if (unclaimed) {
     return (
       <span
@@ -48,22 +52,19 @@ export function StatusPill({ status, live, unclaimed, className = "" }: StatusPi
     );
   }
 
-  const open = status.state === "open";
-  const soon = status.state === "opens_today";
-
-  const tone = open
-    ? "bg-green-500 text-white"
-    : soon
-    ? "bg-brand text-white"
-    : "bg-neutral-200 text-neutral-600";
-
-  const label = open ? (live ? "LIVE NOW" : "OPEN NOW") : status.label;
+  const { tier, label } = status;
+  const tone =
+    tier === "boosted"
+      ? "bg-[#16a34a] text-white"
+      : tier === "open"
+      ? "bg-green-100 text-green-700 ring-1 ring-inset ring-green-500/25"
+      : "bg-neutral-200 text-neutral-600";
 
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide shadow-sm ${tone} ${className}`}
     >
-      {open && (
+      {tier === "boosted" && (
         <span className="relative flex h-1.5 w-1.5 text-white/90">
           <span className="live-beacon absolute inset-0" />
           <span className="relative h-1.5 w-1.5 rounded-full bg-current" />

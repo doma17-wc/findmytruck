@@ -62,9 +62,11 @@ export async function getAllTrucksWithSchedules(): Promise<TruckWithSchedules[]>
       instagram, tiktok, website, languages,
       food_type, dietary_options, payment_methods, features,
       is_active, is_claimed, short_code, created_at, updated_at`;
-  // The unclaimed-profile columns land in migration 0005 -- fall back gracefully
-  // if the code is deployed before that migration has been applied.
+  // The unclaimed-profile columns land in migration 0005 and the boost columns
+  // in 0007 -- fall back gracefully if the code is deployed before either has
+  // been applied.
   const unclaimedCols = `claim_status, source_region, source_website, region_lat, region_lng`;
+  const boostCols = `boosted, boost_expires_at, boost_started_at, boost_lat, boost_lng`;
 
   const run = (cols: string) =>
     supabase
@@ -73,10 +75,9 @@ export async function getAllTrucksWithSchedules(): Promise<TruckWithSchedules[]>
       .eq("is_active", true)
       .order("name", { ascending: true });
 
-  let res = await run(`${baseCols}, ${unclaimedCols}, ${schedulesSelect}`);
-  if (res.error) {
-    res = await run(`${baseCols}, ${schedulesSelect}`);
-  }
+  let res = await run(`${baseCols}, ${unclaimedCols}, ${boostCols}, ${schedulesSelect}`);
+  if (res.error) res = await run(`${baseCols}, ${unclaimedCols}, ${schedulesSelect}`);
+  if (res.error) res = await run(`${baseCols}, ${schedulesSelect}`);
   const { data, error } = res;
 
   if (error) {

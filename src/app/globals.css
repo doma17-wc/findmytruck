@@ -220,10 +220,21 @@ body {
   height: 42px;
   z-index: 5;
 }
-.fmt-pin.is-live {
+/* Boosted pin: bigger than a normal pin, bright green, with a pulsing ring. */
+.fmt-pin.is-boosted {
+  width: 44px;
+  height: 44px;
   color: #16a34a;
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.45);
 }
-.fmt-pin.is-live::before {
+.fmt-pin.is-boosted > span {
+  font-size: 19px;
+}
+.fmt-pin.is-boosted.is-selected {
+  width: 50px;
+  height: 50px;
+}
+.fmt-pin.is-boosted::before {
   content: "";
   position: absolute;
   inset: -3px;

@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import {
   LayoutGrid,
-  Radio,
+  Zap,
   UtensilsCrossed,
   CalendarDays,
   Star,
@@ -17,7 +17,7 @@ import {
 import type { Truck, TruckSchedule, TruckPhoto, Review } from "@/lib/types";
 import { ToastProvider, Beacon, cn } from "./ui";
 import OverviewPanel from "./panels/OverviewPanel";
-import GoLivePanel from "./panels/GoLivePanel";
+import BoostPanel from "./panels/BoostPanel";
 import MenuPanel from "./panels/MenuPanel";
 import SchedulePanel from "./panels/SchedulePanel";
 import ReviewsPanel from "./panels/ReviewsPanel";
@@ -41,14 +41,16 @@ interface Props {
   schedules: TruckSchedule[];
   photos: TruckPhoto[];
   reviews: Review[];
-  liveRow: TruckSchedule | null;
+  boosted: boolean;
+  boostExpiresAt: string | null;
+  boostStartedAt: string | null;
   stats: DashboardStats;
   ownerName: string | null;
 }
 
 type PanelKey =
   | "overview"
-  | "golive"
+  | "boost"
   | "menu"
   | "schedule"
   | "reviews"
@@ -57,7 +59,7 @@ type PanelKey =
 
 const NAV: { key: PanelKey; label: string; icon: typeof LayoutGrid }[] = [
   { key: "overview", label: "Overview", icon: LayoutGrid },
-  { key: "golive", label: "Go Live", icon: Radio },
+  { key: "boost", label: "Boost", icon: Zap },
   { key: "menu", label: "Menu", icon: UtensilsCrossed },
   { key: "schedule", label: "Tour schedule", icon: CalendarDays },
   { key: "reviews", label: "Reviews", icon: Star },
@@ -67,7 +69,7 @@ const NAV: { key: PanelKey; label: string; icon: typeof LayoutGrid }[] = [
 
 const HEADINGS: Record<PanelKey, { title: string; subtitle: string }> = {
   overview: { title: "Overview", subtitle: "How your truck is doing today" },
-  golive: { title: "Go Live", subtitle: "Tell everyone where you're parked right now" },
+  boost: { title: "Boost", subtitle: "Jump to the top of the map when you're serving" },
   menu: { title: "Menu", subtitle: "Prices update on your public profile instantly" },
   schedule: { title: "Tour schedule", subtitle: "Your regular weekly stops" },
   reviews: { title: "Reviews", subtitle: "What customers are saying" },
@@ -76,10 +78,9 @@ const HEADINGS: Record<PanelKey, { title: string; subtitle: string }> = {
 };
 
 export default function DashboardApp(props: Props) {
-  const { truck, liveRow } = props;
+  const { truck, boosted } = props;
   const [active, setActive] = useState<PanelKey>("overview");
   const [drawer, setDrawer] = useState(false);
-  const live = Boolean(liveRow);
 
   const go = (key: PanelKey) => {
     setActive(key);
@@ -106,11 +107,11 @@ export default function DashboardApp(props: Props) {
 
       <div className="rounded-xl bg-white/5 p-3">
         <div className="flex items-center gap-2">
-          <Beacon live={live} />
+          <Beacon live={boosted} />
           <span className="truncate text-sm font-semibold">{truck.name}</span>
         </div>
         <p className="mt-1 text-xs text-white/50">
-          {live ? "Live now" : truck.is_active ? "Listed · offline" : "Not listed"}
+          {boosted ? "Boosted now" : truck.is_active ? "Listed · not boosted" : "Not listed"}
         </p>
         <Link
           href={`/trucks/${truck.slug}`}
@@ -180,16 +181,16 @@ export default function DashboardApp(props: Props) {
             </div>
             <button
               type="button"
-              onClick={() => go("golive")}
+              onClick={() => go("boost")}
               className={cn(
                 "inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-bold transition",
-                live
+                boosted
                   ? "bg-live/10 text-live"
                   : "bg-accent text-white shadow-sm hover:bg-accent-dark"
               )}
             >
-              <Beacon live={live} />
-              {live ? "Live" : "Go Live"}
+              <Beacon live={boosted} />
+              {boosted ? "Boosted" : "Boost"}
             </button>
           </header>
 
@@ -204,7 +205,7 @@ export default function DashboardApp(props: Props) {
               {active === "overview" && (
                 <OverviewPanel {...props} onNavigate={go} />
               )}
-              {active === "golive" && <GoLivePanel {...props} />}
+              {active === "boost" && <BoostPanel {...props} />}
               {active === "menu" && <MenuPanel truck={truck} />}
               {active === "schedule" && <SchedulePanel schedules={props.schedules} />}
               {active === "reviews" && <ReviewsPanel reviews={props.reviews} />}

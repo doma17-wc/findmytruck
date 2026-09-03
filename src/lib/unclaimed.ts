@@ -42,9 +42,12 @@ export function regionFallbackStatus(truck: PublicTruck): TruckStatus | null {
   };
 
   return {
-    state: "none",
-    label: REGION_FALLBACK_LABEL,
+    tier: "closed",
+    label: "Closed",
+    detail: REGION_FALLBACK_LABEL,
     schedule,
+    openUntil: null,
+    boostedAt: null,
     isRegionFallback: true,
   };
 }

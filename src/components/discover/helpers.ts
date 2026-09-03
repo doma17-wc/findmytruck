@@ -1,40 +1,11 @@
-import type { TruckSchedule } from "@/lib/types";
 import type { TruckWithSchedules } from "@/lib/data";
-import {
-  computeTruckStatus,
-  getMondayFirstDay,
-  isNowWithin,
-  timeToMinutes,
-} from "@/lib/geo";
+import { computeTruckStatus, readBoost } from "@/lib/geo";
 import { regionFallbackStatus } from "@/lib/unclaimed";
 import type { DiscoverEntry, TruckRating } from "./types";
 
-/**
- * True when the truck's weekly schedule has a recurring slot for the current
- * day of the week whose time window contains `now`.
- *
- * This is deliberately independent of the derived `status` / region-fallback
- * logic: a truck only counts as "open now" if it has a real schedule entry that
- * is active right now. Imported/unclaimed trucks (region-marker only, or the
- * synthetic 00:00–00:00 fallback) never qualify.
- */
-export function isOpenNow(schedules: TruckSchedule[], now: Date): boolean {
-  const todayIdx = getMondayFirstDay(now);
-  const todayISO = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
-    now.getDate()
-  ).padStart(2, "0")}`;
-  return schedules.some((s) => {
-    if (s.start_time === s.end_time) return false; // region-marker placeholder
-    if (s.specific_date) return s.specific_date === todayISO && isNowWithin(s.start_time, s.end_time, now);
-    return s.day_of_week === todayIdx && isNowWithin(s.start_time, s.end_time, now);
-  });
-}
-
-/** The synthetic "Go live" schedule row, if the truck has one for today. */
-export function findLiveRow(schedules: TruckSchedule[]): TruckSchedule | null {
-  return (
-    schedules.find((s) => s.specific_date != null || s.notes === "live") ?? null
-  );
+/** True when a truck reads as available right now — boosted OR open by schedule. */
+export function isAvailableNow(entry: DiscoverEntry): boolean {
+  return entry.status.tier !== "closed";
 }
 
 export function buildEntries(
@@ -44,16 +15,20 @@ export function buildEntries(
 ): DiscoverEntry[] {
   return trucks
     .map(({ truck, schedules }): DiscoverEntry | null => {
-      let status = computeTruckStatus(schedules, now);
-      if (!status.schedule) status = regionFallbackStatus(truck) ?? status;
+      let status = computeTruckStatus(schedules, now, readBoost(truck));
+
+      // No real pin yet — drop the truck at its region centre (imported profile).
+      if (!status.schedule) {
+        const fallback = regionFallbackStatus(truck);
+        if (!fallback) return null;
+        status =
+          status.tier === "closed"
+            ? fallback
+            : { ...status, schedule: fallback.schedule, isRegionFallback: true };
+      }
+
       const active = status.schedule;
       if (!active) return null;
-
-      const liveRow = findLiveRow(schedules);
-      const live =
-        liveRow != null &&
-        isNowWithin(liveRow.start_time, liveRow.end_time, now) &&
-        status.state === "open";
 
       return {
         truck,
@@ -61,22 +36,9 @@ export function buildEntries(
         schedules,
         coord: [active.location_lng, active.location_lat],
         rating: ratings[truck.id] ?? null,
-        live,
-        liveSince: live && liveRow ? liveRow.start_time : null,
       };
     })
     .filter((e): e is DiscoverEntry => e !== null);
-}
-
-/** "just now" / "12 min ago" / "3h ago" from an "HH:MM[:SS]" time earlier today. */
-export function timeAgo(hhmm: string, now: Date): string {
-  const nowMin = now.getHours() * 60 + now.getMinutes();
-  const diff = Math.max(0, nowMin - timeToMinutes(hhmm));
-  if (diff < 1) return "just now";
-  if (diff < 60) return `${diff} min ago`;
-  const h = Math.floor(diff / 60);
-  const m = diff % 60;
-  return m ? `${h}h ${m}m ago` : `${h}h ago`;
 }
 
 /**

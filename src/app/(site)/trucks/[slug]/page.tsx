@@ -10,7 +10,7 @@ import { normalizeMenuItems } from "@/lib/menu";
 import { isUnclaimed, UNCLAIMED_BADGE } from "@/lib/unclaimed";
 import TruckMenu from "@/components/site/TruckMenu";
 import TruckPlaceholder from "@/components/site/TruckPlaceholder";
-import { formatTimeRange, getMondayFirstDay, isNowWithin } from "@/lib/geo";
+import { computeTruckStatus, formatTimeRange, getMondayFirstDay, readBoost } from "@/lib/geo";
 import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
 import FavoriteButton from "@/components/FavoriteButton";
 
@@ -83,7 +83,9 @@ export default async function TruckProfilePage({ params }: PageProps) {
   const today = getMondayFirstDay();
   const todaySchedule = schedule.filter((s) => s.day_of_week === today);
   const nextStop = todaySchedule[0] ?? schedule[0];
-  const openNow = todaySchedule.some((s) => isNowWithin(s.start_time, s.end_time));
+  const status = computeTruckStatus(schedule, new Date(), readBoost(truck));
+  const boosted = status.tier === "boosted";
+  const openNow = status.tier !== "closed";
 
   const directionsUrl = nextStop
     ? `https://www.google.com/maps/dir/?api=1&destination=${nextStop.location_lat},${nextStop.location_lng}`
@@ -170,10 +172,14 @@ export default async function TruckProfilePage({ params }: PageProps) {
             {!unclaimed && (
               <span
                 className={`mt-1 flex-shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
-                  openNow ? "bg-green-100 text-green-700" : "bg-neutral-100 text-neutral-500"
+                  boosted
+                    ? "bg-[#16a34a] text-white"
+                    : openNow
+                    ? "bg-green-100 text-green-700"
+                    : "bg-neutral-100 text-neutral-500"
                 }`}
               >
-                {openNow ? "Open now" : "Closed"}
+                {status.label}
               </span>
             )}
           </div>

@@ -2,18 +2,16 @@
 
 import { forwardRef } from "react";
 import Image from "next/image";
-import { Radio } from "lucide-react";
+import { Zap } from "lucide-react";
 import { formatDistance } from "@/lib/geo";
 import { isUnclaimed } from "@/lib/unclaimed";
 import FavoriteButton from "@/components/FavoriteButton";
 import TruckPlaceholder from "@/components/site/TruckPlaceholder";
 import type { DiscoverEntry } from "./types";
 import { RatingBadge, StatusPill } from "./Bits";
-import { timeAgo } from "./helpers";
 
 interface TruckCardProps {
   entry: DiscoverEntry;
-  now: Date;
   signedIn: boolean;
   favorited: boolean;
   selected: boolean;
@@ -23,12 +21,13 @@ interface TruckCardProps {
 }
 
 const TruckCard = forwardRef<HTMLDivElement, TruckCardProps>(function TruckCard(
-  { entry, now, signedIn, favorited, selected, distanceKm, onSelect, onHover },
+  { entry, signedIn, favorited, selected, distanceKm, onSelect, onHover },
   ref
 ) {
-  const { truck, status, rating, live, liveSince } = entry;
+  const { truck, status, rating } = entry;
   const image = truck.cover_photo_url ?? truck.logo_url;
   const unclaimed = isUnclaimed(truck);
+  const boosted = status.tier === "boosted";
   const cityLine = status.schedule?.location_name ?? truck.source_region ?? "Location to be confirmed";
 
   return (
@@ -63,7 +62,7 @@ const TruckCard = forwardRef<HTMLDivElement, TruckCardProps>(function TruckCard(
 
         <div className="min-w-0 flex-1 p-3.5 pr-10">
           <div className="flex items-center gap-2">
-            <StatusPill status={status} live={live} unclaimed={unclaimed} />
+            <StatusPill status={status} unclaimed={unclaimed} />
           </div>
 
           <h3 className="mt-1.5 truncate font-display text-[17px] font-bold leading-tight text-ink">
@@ -81,16 +80,19 @@ const TruckCard = forwardRef<HTMLDivElement, TruckCardProps>(function TruckCard(
             <span className="text-muted">📍</span> {cityLine}
           </p>
 
-          {live && liveSince ? (
-            <p className="mt-1.5 inline-flex items-center gap-1 text-[12px] font-semibold text-live">
-              <Radio className="h-3.5 w-3.5" />
-              Confirmed live {timeAgo(liveSince, now)}
+          {!unclaimed && status.detail && (
+            <p
+              className={`mt-1.5 inline-flex items-center gap-1 text-[12px] font-semibold ${
+                boosted
+                  ? "text-live"
+                  : status.tier === "open"
+                  ? "text-green-600"
+                  : "font-medium text-muted"
+              }`}
+            >
+              {boosted && <Zap className="h-3.5 w-3.5" fill="currentColor" />}
+              {status.detail}
             </p>
-          ) : (
-            !unclaimed &&
-            status.state !== "open" && (
-              <p className="mt-1.5 text-[12px] font-medium text-muted">{status.label}</p>
-            )
           )}
 
           {distanceKm !== null && (
