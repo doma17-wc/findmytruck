@@ -50,7 +50,7 @@ export default function LocationSearch({ onSelect }: LocationSearchProps) {
         onChange={(e) => setQuery(e.target.value)}
         onFocus={() => results.length > 0 && setOpen(true)}
         placeholder="Search an address in Switzerland…"
-        className="w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-[15px] focus:border-brand focus:outline-none"
+        className="w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-[15px] focus:border-accent focus:outline-none"
       />
       {open && results.length > 0 && (
         <ul className="absolute z-10 mt-1 w-full rounded-xl border border-neutral-200 bg-white shadow-lg">

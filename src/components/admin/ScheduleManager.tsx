@@ -7,7 +7,7 @@ import { saveScheduleAction, deleteScheduleAction } from "@/app/admin/actions";
 import LocationSearch from "./LocationSearch";
 
 const inputClass =
-  "w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-[15px] focus:border-brand focus:outline-none";
+  "w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-[15px] focus:border-accent focus:outline-none";
 
 interface ScheduleManagerProps {
   truckId: string;
@@ -148,7 +148,7 @@ export default function ScheduleManager({ truckId, schedules }: ScheduleManagerP
             type="button"
             onClick={handleAdd}
             disabled={submitting}
-            className="w-full rounded-xl bg-brand py-2.5 text-sm font-bold text-white disabled:opacity-60"
+            className="w-full rounded-xl bg-accent py-2.5 text-sm font-bold text-white disabled:opacity-60"
           >
             {submitting ? "Adding…" : "Add stop"}
           </button>

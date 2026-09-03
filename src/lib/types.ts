@@ -44,6 +44,9 @@ export interface PublicTruck {
   boost_started_at?: string | null;
   boost_lat?: number | null;
   boost_lng?: number | null;
+  /** Admin "pause" (migration 0008). A paused truck keeps all its data but is
+   *  hidden from every public surface. May be absent on rows read before 0008. */
+  paused?: boolean | null;
 }
 
 export type ClaimStatus = "unclaimed" | "pending" | "claimed";

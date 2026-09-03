@@ -13,6 +13,8 @@ export async function getTruckBySlug(slug: string): Promise<PublicTruck | null> 
     console.error("getTruckBySlug error", error);
     return null;
   }
+  // A paused truck (admin, migration 0008) is hidden from the public site.
+  if (data && (data as PublicTruck).paused) return null;
   return data as PublicTruck | null;
 }
 
@@ -75,7 +77,9 @@ export async function getAllTrucksWithSchedules(): Promise<TruckWithSchedules[]>
       .eq("is_active", true)
       .order("name", { ascending: true });
 
-  let res = await run(`${baseCols}, ${unclaimedCols}, ${boostCols}, ${schedulesSelect}`);
+  // `paused` lands in migration 0008 -- try it first, then fall back.
+  let res = await run(`${baseCols}, ${unclaimedCols}, ${boostCols}, paused, ${schedulesSelect}`);
+  if (res.error) res = await run(`${baseCols}, ${unclaimedCols}, ${boostCols}, ${schedulesSelect}`);
   if (res.error) res = await run(`${baseCols}, ${unclaimedCols}, ${schedulesSelect}`);
   if (res.error) res = await run(`${baseCols}, ${schedulesSelect}`);
   const { data, error } = res;
@@ -86,10 +90,12 @@ export async function getAllTrucksWithSchedules(): Promise<TruckWithSchedules[]>
   }
 
   type Row = PublicTruck & { truck_schedules: TruckSchedule[] | null };
-  return ((data ?? []) as unknown as Row[]).map((row) => {
-    const { truck_schedules, ...truck } = row;
-    return { truck: truck as PublicTruck, schedules: truck_schedules ?? [] };
-  });
+  return ((data ?? []) as unknown as Row[])
+    .filter((row) => !row.paused)
+    .map((row) => {
+      const { truck_schedules, ...truck } = row;
+      return { truck: truck as PublicTruck, schedules: truck_schedules ?? [] };
+    });
 }
 
 export async function getAllActiveTrucks(): Promise<PublicTruck[]> {
@@ -103,5 +109,5 @@ export async function getAllActiveTrucks(): Promise<PublicTruck[]> {
     console.error("getAllActiveTrucks error", error);
     return [];
   }
-  return (data ?? []) as PublicTruck[];
+  return ((data ?? []) as PublicTruck[]).filter((t) => !t.paused);
 }
