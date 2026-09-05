@@ -5,7 +5,7 @@ import type { Truck, TruckSchedule, TruckPhoto } from "@/lib/types";
 import TruckForm from "@/components/admin/TruckForm";
 import AdminMenuBuilder from "@/components/admin/AdminMenuBuilder";
 import ScheduleManager from "@/components/admin/ScheduleManager";
-import PhotoUploader from "@/components/admin/PhotoUploader";
+import AdminPhotoGallery from "@/components/admin/AdminPhotoGallery";
 import QrPanel from "@/components/admin/QrPanel";
 
 export const dynamic = "force-dynamic";
@@ -66,7 +66,7 @@ export default async function EditTruckPage({ params }: { params: { id: string }
           <ScheduleManager truckId={t.id} schedules={(schedules ?? []) as TruckSchedule[]} />
         </Section>
         <Section title="Photo gallery">
-          <PhotoUploader truckId={t.id} photos={(photos ?? []) as TruckPhoto[]} />
+          <AdminPhotoGallery truckId={t.id} photos={(photos ?? []) as TruckPhoto[]} />
         </Section>
         <Section title="QR code">
           <QrPanel

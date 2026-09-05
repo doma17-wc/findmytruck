@@ -11,7 +11,8 @@ import LocationAutocomplete from "../LocationAutocomplete";
 
 interface DayState {
   location: string;
-  time: string;
+  startTime: string;
+  endTime: string;
   open: boolean;
   lat: number | null;
   lng: number | null;
@@ -22,7 +23,8 @@ function buildDays(schedules: TruckSchedule[]): DayState[] {
     const row = schedules.find((s) => !s.specific_date && s.day_of_week === day);
     return {
       location: row?.location_name ?? "",
-      time: row ? `${row.start_time.slice(0, 5)}-${row.end_time.slice(0, 5)}` : "11:00-14:00",
+      startTime: row ? row.start_time.slice(0, 5) : "11:00",
+      endTime: row ? row.end_time.slice(0, 5) : "14:00",
       open: Boolean(row),
       lat: row?.location_lat ?? null,
       lng: row?.location_lng ?? null,
@@ -43,7 +45,8 @@ export default function SchedulePanel({ schedules }: { schedules: TruckSchedule[
     const payload: TourDayInput[] = days.map((d, day) => ({
       day,
       location: d.location,
-      time: d.time,
+      startTime: d.startTime,
+      endTime: d.endTime,
       open: d.open,
       // Coordinates from a picked suggestion (or an untouched saved row) travel
       // straight through; a null pair tells the server to geocode the text.
@@ -69,7 +72,7 @@ export default function SchedulePanel({ schedules }: { schedules: TruckSchedule[
                 <div
                   key={idx}
                   className={cn(
-                    "grid grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-[6rem_1fr_9rem_auto] sm:items-center sm:gap-3",
+                    "grid grid-cols-1 gap-2 px-4 py-3 sm:grid-cols-[6rem_1fr_5.5rem_5.5rem_auto] sm:items-center sm:gap-3",
                     isToday && "bg-accent/5"
                   )}
                 >
@@ -103,11 +106,21 @@ export default function SchedulePanel({ schedules }: { schedules: TruckSchedule[
                   />
 
                   <input
-                    value={d.time}
-                    onChange={(e) => patch(idx, { time: e.target.value })}
-                    placeholder="11:00-14:00"
+                    type="time"
+                    value={d.startTime}
+                    onChange={(e) => patch(idx, { startTime: e.target.value })}
                     disabled={!d.open}
-                    className="w-full rounded-lg border border-line bg-card px-3 py-2 font-mono text-sm outline-none focus:border-accent disabled:opacity-40"
+                    aria-label={`${label} start time`}
+                    className="w-full rounded-lg border border-line bg-card px-2 py-2 font-mono text-sm outline-none focus:border-accent disabled:opacity-40"
+                  />
+
+                  <input
+                    type="time"
+                    value={d.endTime}
+                    onChange={(e) => patch(idx, { endTime: e.target.value })}
+                    disabled={!d.open}
+                    aria-label={`${label} end time`}
+                    className="w-full rounded-lg border border-line bg-card px-2 py-2 font-mono text-sm outline-none focus:border-accent disabled:opacity-40"
                   />
 
                   <button

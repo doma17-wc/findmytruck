@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -17,9 +17,10 @@ import TruckPlaceholder from "@/components/site/TruckPlaceholder";
 import TruckMenu from "@/components/site/TruckMenu";
 import FavoriteButton from "@/components/FavoriteButton";
 import { normalizeMenuItems } from "@/lib/menu";
-import { DAY_LABELS_SHORT } from "@/lib/types";
+import { DAY_LABELS_SHORT, type TruckPhoto } from "@/lib/types";
 import { formatTimeRange, getMondayFirstDay } from "@/lib/geo";
 import { isUnclaimed } from "@/lib/unclaimed";
+import { createClient } from "@/lib/supabase/client";
 import type { DiscoverEntry } from "./types";
 import { RatingBadge } from "./Bits";
 import { dietaryPills } from "./helpers";
@@ -74,7 +75,35 @@ export default function DetailSheet({
     };
   }, [onClose]);
 
-  const heroImage = truck.cover_photo_url ?? truck.logo_url;
+  // Lazy-load the gallery only for the truck currently open in the sheet —
+  // fetching photos for every pin/list row up front would be wasteful.
+  const [photos, setPhotos] = useState<TruckPhoto[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    setPhotos([]);
+    void (async () => {
+      const { data } = await createClient()
+        .from("truck_photos")
+        .select("*")
+        .eq("truck_id", truck.id)
+        .order("sort_order", { ascending: true });
+      if (!cancelled && data) setPhotos(data as TruckPhoto[]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [truck.id]);
+
+  const fallbackImage = truck.cover_photo_url ?? truck.logo_url;
+  const galleryImages = photos.length > 0 ? photos.map((p) => p.url) : fallbackImage ? [fallbackImage] : [];
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [activeIdx, setActiveIdx] = useState(0);
+  const onHeroScroll = () => {
+    const el = scrollRef.current;
+    if (!el || el.clientWidth === 0) return;
+    setActiveIdx(Math.round(el.scrollLeft / el.clientWidth));
+  };
 
   return (
     <div className="fixed inset-0 z-[60]">
@@ -89,14 +118,32 @@ export default function DetailSheet({
         aria-label={truck.name}
         className="sheet-in absolute inset-y-0 right-0 flex w-full max-w-[460px] flex-col bg-paper shadow-2xl"
       >
-        {/* Hero */}
-        <div className="relative h-52 flex-shrink-0 bg-paper-deep">
-          {heroImage ? (
-            <Image src={heroImage} alt={truck.name} fill className="object-cover" sizes="460px" />
+        {/* Hero photo carousel */}
+        <div className="relative h-64 flex-shrink-0 bg-paper-deep sm:h-72">
+          {galleryImages.length > 0 ? (
+            <div
+              ref={scrollRef}
+              onScroll={onHeroScroll}
+              className="no-scrollbar flex h-full w-full snap-x snap-mandatory overflow-x-auto scroll-smooth"
+            >
+              {galleryImages.map((src, i) => (
+                <div key={src + i} className="relative h-full w-full flex-shrink-0 snap-center">
+                  <Image
+                    src={src}
+                    alt={`${truck.name} photo ${i + 1}`}
+                    fill
+                    priority={i === 0}
+                    className="object-cover"
+                    sizes="460px"
+                  />
+                </div>
+              ))}
+            </div>
           ) : (
             <TruckPlaceholder name={truck.name} />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-ink/50 via-transparent to-ink/10" />
+
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-ink/45 via-transparent to-ink/10" />
 
           <button
             type="button"
@@ -111,31 +158,46 @@ export default function DetailSheet({
             {plate}
           </span>
 
-          <div className="absolute bottom-3 left-4 right-4">
-            <h2 className="font-display text-2xl font-extrabold leading-tight text-white drop-shadow">
-              {truck.name}
-            </h2>
-            <div className="mt-1 flex items-center gap-2 text-[13px] font-medium text-white/90">
-              <span>{truck.cuisine_type.join(" · ") || "Food truck"}</span>
-              {truck.price_range && <span className="opacity-80">· {truck.price_range}</span>}
+          {galleryImages.length > 1 && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-3 flex items-center justify-center gap-1.5">
+              {galleryImages.map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-1.5 rounded-full shadow-sm transition-all ${
+                    i === activeIdx ? "w-4 bg-white" : "w-1.5 bg-white/60"
+                  }`}
+                />
+              ))}
             </div>
-          </div>
+          )}
         </div>
 
         {/* Scroll body */}
         <div className="no-scrollbar flex-1 overflow-y-auto px-4 py-4">
-          <div className="flex items-center justify-between gap-3">
-            {rating && rating.count > 0 ? (
-              <RatingBadge rating={rating} size="lg" />
-            ) : (
-              <span className="text-sm text-muted">No reviews yet</span>
-            )}
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <h2 className="font-display text-2xl font-extrabold leading-tight text-ink">
+                {truck.name}
+              </h2>
+              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] font-medium text-ink-soft">
+                <span>{truck.cuisine_type.join(" · ") || "Food truck"}</span>
+                {truck.price_range && <span className="opacity-70">· {truck.price_range}</span>}
+              </div>
+            </div>
             <FavoriteButton
               truckId={truck.id}
               initialFavorited={favorited}
               signedIn={signedIn}
               size="md"
             />
+          </div>
+
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            {rating && rating.count > 0 ? (
+              <RatingBadge rating={rating} size="lg" />
+            ) : (
+              <span className="text-sm text-muted">No reviews yet</span>
+            )}
           </div>
 
           {pills.length > 0 && (

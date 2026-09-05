@@ -232,37 +232,19 @@ export default function TruckForm({ truck }: { truck?: Truck }) {
         {isNew ? (
           <>
             <p className="text-xs text-muted">
-              Save the truck first, then re-open it to upload a logo, cover and gallery. You can
-              paste image URLs here for now.
+              Save the truck first, then re-open it to upload a logo and photo gallery. You can
+              paste a logo URL here for now.
             </p>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <Field label="Logo URL">
-                <input name="logo_url" className={adminInput} />
-              </Field>
-              <Field label="Cover photo URL">
-                <input name="cover_photo_url" className={adminInput} />
-              </Field>
-              <Field label="Menu photo URL">
-                <input name="menu_photo_url" className={adminInput} />
-              </Field>
-            </div>
+            <Field label="Logo URL">
+              <input name="logo_url" className={adminInput} />
+            </Field>
           </>
         ) : (
-          <>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <ImageDropzone name="logo_url" label="Logo" truckId={truck!.id} initialUrl={truck!.logo_url} aspect="square" />
-              <ImageDropzone name="cover_photo_url" label="Cover photo" truckId={truck!.id} initialUrl={truck!.cover_photo_url} aspect="wide" />
-            </div>
-            <ImageDropzone
-              name="menu_photo_url"
-              label="Menu photo"
-              truckId={truck!.id}
-              initialUrl={truck!.menu_photo_url}
-              aspect="wide"
-              hint="optional — a photo of the printed menu"
-            />
-          </>
+          <ImageDropzone name="logo_url" label="Logo" truckId={truck!.id} initialUrl={truck!.logo_url} aspect="square" />
         )}
+        <p className="text-xs text-muted">
+          Cover photo and the rest of the gallery are managed in the &ldquo;Photo gallery&rdquo; section below.
+        </p>
         <details className="rounded-xl border border-line bg-card p-3">
           <summary className="cursor-pointer text-sm font-semibold text-ink-soft">
             Legacy menu text

@@ -130,7 +130,13 @@ export default function LocationAutocomplete({
   const choose = useCallback(
     (f: GeocodeFeature) => {
       skipNextRef.current = true;
-      const name = f.text || f.place_name.split(",")[0];
+      // Full address (street + number + postal code + city), country suffix
+      // trimmed since search is already restricted to Switzerland.
+      const name = (f.place_name || f.text)
+        .replace(/,\s*Switzerland$/i, "")
+        .replace(/,\s*Schweiz$/i, "")
+        .replace(/,\s*Suisse$/i, "")
+        .trim();
       onChange(name);
       onPick({ name, lat: f.center[1], lng: f.center[0] });
       setOpen(false);

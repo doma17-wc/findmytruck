@@ -64,8 +64,8 @@ export async function saveSettingsAction(
     cuisine_type: csv("cuisine_type"),
     price_range: String(formData.get("price_range") ?? "") || null,
     logo_url: String(formData.get("logo_url") ?? "") || null,
-    cover_photo_url: String(formData.get("cover_photo_url") ?? "") || null,
-    menu_photo_url: String(formData.get("menu_photo_url") ?? "") || null,
+    // cover_photo_url is owned by the photo gallery (synced by syncCoverPhoto,
+    // see the PHOTOS section below) — never overwritten from this form.
     instagram: String(formData.get("instagram") ?? "") || null,
     tiktok: String(formData.get("tiktok") ?? "") || null,
     website: String(formData.get("website") ?? "") || null,
@@ -112,19 +112,21 @@ export async function saveMenuAction(items: unknown): Promise<ActionResult> {
 export interface TourDayInput {
   day: number; // 0 = Mon .. 6 = Sun
   location: string;
-  time: string; // "hh:mm-hh:mm"
+  startTime: string; // "HH:MM"
+  endTime: string; // "HH:MM"
   open: boolean;
   /** Coordinates already known for this location (skip re-geocoding). */
   lat: number | null;
   lng: number | null;
 }
 
-function parseTimeRange(raw: string): { start: string; end: string } {
-  const m = raw.match(/(\d{1,2})[:.]?(\d{2})?\s*[-–—to]+\s*(\d{1,2})[:.]?(\d{2})?/);
-  const pad = (h: string, mm?: string) =>
-    `${String(Math.min(23, Math.max(0, Number(h)))).padStart(2, "0")}:${(mm ?? "00").padStart(2, "0")}`;
-  if (!m) return { start: "11:00", end: "14:00" };
-  return { start: pad(m[1], m[2]), end: pad(m[3], m[4]) };
+/** Clamp a "HH:MM" (or "H:MM") string to a valid 24h time, default on garbage input. */
+function clampTime(raw: string, fallback: string): string {
+  const m = (raw ?? "").match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return fallback;
+  const h = Math.min(23, Math.max(0, Number(m[1])));
+  const mm = Math.min(59, Math.max(0, Number(m[2])));
+  return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
 export async function publishTourAction(days: TourDayInput[]): Promise<ActionResult> {
@@ -162,15 +164,14 @@ export async function publishTourAction(days: TourDayInput[]): Promise<ActionRes
       }
     }
 
-    const { start, end } = parseTimeRange(d.time ?? "");
     rows.push({
       truck_id: truckId,
       day_of_week: Math.min(6, Math.max(0, Math.round(d.day))),
       location_name: location,
       location_lat: lat,
       location_lng: lng,
-      start_time: start,
-      end_time: end,
+      start_time: clampTime(d.startTime, "11:00"),
+      end_time: clampTime(d.endTime, "14:00"),
       is_recurring: true,
     });
   }
@@ -304,8 +305,27 @@ export async function replyToReviewAction(reviewId: string, reply: string): Prom
 }
 
 /* ------------------------------------------------------------------ *
- * PHOTOS  (unchanged behaviour, moved with the route)
+ * PHOTOS  (one unified gallery — the first photo is always the cover;
+ * trucks.cover_photo_url is kept in sync so every existing reader — map
+ * pins, DetailSheet hero, JSON-LD, OG image — needs no changes.)
  * ------------------------------------------------------------------ */
+
+type SupabaseServer = ReturnType<typeof createClient>;
+
+async function syncCoverPhoto(supabase: SupabaseServer, truckId: string) {
+  const { data: first } = await supabase
+    .from("truck_photos")
+    .select("url")
+    .eq("truck_id", truckId)
+    .order("sort_order", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  await supabase
+    .from("trucks")
+    .update({ cover_photo_url: first?.url ?? null })
+    .eq("id", truckId);
+}
 
 export async function addOwnPhotoAction(url: string, caption: string) {
   const truckId = await requireOwnTruckId();
@@ -323,7 +343,8 @@ export async function addOwnPhotoAction(url: string, caption: string) {
     sort_order: count ?? 0,
   });
 
-  revalidatePath("/dashboard");
+  await syncCoverPhoto(supabase, truckId);
+  revalidateEverywhere();
 }
 
 export async function deleteOwnPhotoAction(photoId: string) {
@@ -344,8 +365,8 @@ export async function deleteOwnPhotoAction(photoId: string) {
     await supabase.storage.from(PHOTO_BUCKET).remove([path]);
   }
 
-  revalidatePath("/dashboard");
-  revalidatePath("/");
+  await syncCoverPhoto(supabase, truckId);
+  revalidateEverywhere();
 }
 
 export async function reorderOwnPhotosAction(orderedIds: string[]) {
@@ -358,6 +379,34 @@ export async function reorderOwnPhotosAction(orderedIds: string[]) {
     )
   );
 
-  revalidatePath("/dashboard");
-  revalidatePath("/");
+  await syncCoverPhoto(supabase, truckId);
+  revalidateEverywhere();
+}
+
+/** Move one photo to the front (sort_order 0) — used by "Set as cover". */
+export async function setCoverOwnPhotoAction(photoId: string) {
+  const truckId = await requireOwnTruckId();
+  const supabase = createClient();
+
+  const { data: rows } = await supabase
+    .from("truck_photos")
+    .select("id")
+    .eq("truck_id", truckId)
+    .order("sort_order", { ascending: true });
+
+  const ordered = (rows ?? []).map((r) => r.id);
+  const idx = ordered.indexOf(photoId);
+  if (idx > 0) {
+    ordered.splice(idx, 1);
+    ordered.unshift(photoId);
+  }
+
+  await Promise.all(
+    ordered.map((id, index) =>
+      supabase.from("truck_photos").update({ sort_order: index }).eq("id", id).eq("truck_id", truckId)
+    )
+  );
+
+  await syncCoverPhoto(supabase, truckId);
+  revalidateEverywhere();
 }

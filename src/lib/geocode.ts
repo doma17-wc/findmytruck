@@ -27,10 +27,16 @@ export async function geocode(query: string): Promise<GeocodeResult | null> {
     const json = await res.json();
     const feature = json.features?.[0];
     if (!feature?.center) return null;
+    const placeName = typeof feature.place_name === "string" ? feature.place_name : q;
     return {
       lat: feature.center[1],
       lng: feature.center[0],
-      name: typeof feature.place_name === "string" ? feature.place_name.split(",")[0] : q,
+      // Full address, country suffix trimmed (search is restricted to Switzerland).
+      name: placeName
+        .replace(/,\s*Switzerland$/i, "")
+        .replace(/,\s*Schweiz$/i, "")
+        .replace(/,\s*Suisse$/i, "")
+        .trim(),
     };
   } catch {
     return null;

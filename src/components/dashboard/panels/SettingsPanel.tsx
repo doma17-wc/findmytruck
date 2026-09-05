@@ -13,10 +13,38 @@ import {
   PAYMENT_METHOD_OPTIONS,
   FEATURE_OPTIONS,
 } from "@/lib/truckOptions";
-import { saveSettingsAction, type ActionResult } from "@/app/dashboard/actions";
+import { createClient } from "@/lib/supabase/client";
+import { resizeImage } from "@/lib/imageResize";
+import { PHOTO_BUCKET, storagePathFromPublicUrl } from "@/lib/storage";
+import {
+  saveSettingsAction,
+  addOwnPhotoAction,
+  deleteOwnPhotoAction,
+  reorderOwnPhotosAction,
+  setCoverOwnPhotoAction,
+  type ActionResult,
+} from "@/app/dashboard/actions";
 import { Card, CardBody, useToast, cn, dashInput } from "../ui";
 import ImageDropzone from "../ImageDropzone";
-import DashboardPhotoUploader from "../DashboardPhotoUploader";
+import PhotoGalleryManager from "@/components/shared/PhotoGalleryManager";
+
+async function uploadGalleryPhoto(truckId: string, file: File): Promise<string> {
+  const supabase = createClient();
+  const { blob, ext, contentType } = await resizeImage(file, 1600);
+  const path = `${truckId}/gallery-${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage
+    .from(PHOTO_BUCKET)
+    .upload(path, blob, { cacheControl: "3600", upsert: false, contentType });
+  if (error) throw new Error(error.message);
+  const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+  return data.publicUrl;
+}
+
+async function removeGalleryPhotoFromStorage(url: string) {
+  const path = storagePathFromPublicUrl(url);
+  if (!path) return;
+  await createClient().storage.from(PHOTO_BUCKET).remove([path]);
+}
 
 function toggle(list: string[], value: string) {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -187,21 +215,26 @@ export default function SettingsPanel({ truck, photos }: { truck: Truck; photos:
       </Section>
 
       <Section title="Photos">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <ImageDropzone name="logo_url" label="Logo" truckId={truck.id} initialUrl={truck.logo_url} aspect="square" />
-          <ImageDropzone name="cover_photo_url" label="Cover photo" truckId={truck.id} initialUrl={truck.cover_photo_url} aspect="wide" />
-        </div>
         <ImageDropzone
-          name="menu_photo_url"
-          label="Menu photo"
+          name="logo_url"
+          label="Logo"
           truckId={truck.id}
-          initialUrl={truck.menu_photo_url}
-          aspect="wide"
-          hint="optional — a photo of your printed menu"
+          initialUrl={truck.logo_url}
+          aspect="square"
+          hint="optional — shown as a small badge on your profile"
         />
         <div>
           <span className="mb-1.5 block text-sm font-semibold text-ink">Gallery</span>
-          <DashboardPhotoUploader truckId={truck.id} photos={photos} />
+          <PhotoGalleryManager
+            truckId={truck.id}
+            photos={photos}
+            uploadToStorage={uploadGalleryPhoto}
+            removeFromStorage={removeGalleryPhotoFromStorage}
+            onAdd={(url) => addOwnPhotoAction(url, "")}
+            onDelete={(id) => deleteOwnPhotoAction(id)}
+            onReorder={(ids) => reorderOwnPhotosAction(ids)}
+            onSetCover={(id) => setCoverOwnPhotoAction(id)}
+          />
         </div>
       </Section>
 

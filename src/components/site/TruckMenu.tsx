@@ -1,4 +1,4 @@
-import { formatChf, groupMenu, type MenuItem } from "@/lib/menu";
+import { formatChf, groupMenu, MENU_DIETARY_TAGS, type MenuItem } from "@/lib/menu";
 
 export default function TruckMenu({ items }: { items: MenuItem[] }) {
   if (items.length === 0) return null;
@@ -36,6 +36,22 @@ export default function TruckMenu({ items }: { items: MenuItem[] }) {
                   </div>
                   {item.description && (
                     <p className="mt-0.5 text-sm leading-relaxed text-neutral-500">{item.description}</p>
+                  )}
+                  {item.dietary && item.dietary.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {item.dietary.map((id) => {
+                        const tag = MENU_DIETARY_TAGS.find((t) => t.id === id);
+                        if (!tag) return null;
+                        return (
+                          <span
+                            key={id}
+                            className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${tag.className}`}
+                          >
+                            {tag.label}
+                          </span>
+                        );
+                      })}
+                    </div>
                   )}
                 </li>
               );

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { Ban, Check, Plus, Trash2 } from "lucide-react";
 import type { Truck } from "@/lib/types";
-import { normalizeMenuItems, groupMenu, type MenuItem } from "@/lib/menu";
+import { normalizeMenuItems, groupMenu, MENU_DIETARY_TAGS, type DietaryTagId, type MenuItem } from "@/lib/menu";
 import { saveTruckMenuAction } from "@/app/admin/actions";
 import { cn } from "./ui";
 
@@ -14,6 +14,7 @@ interface EditItem {
   price: string;
   category: string;
   sold_out: boolean;
+  dietary: DietaryTagId[];
 }
 
 const uid = () =>
@@ -28,6 +29,7 @@ function toEditItems(raw: MenuItem[]): EditItem[] {
       price: it.price === null ? "" : String(it.price),
       category: g.category,
       sold_out: Boolean(it.sold_out),
+      dietary: it.dietary ?? [],
     }))
   );
 }
@@ -42,6 +44,7 @@ function serialize(items: EditItem[]): MenuItem[] {
         description: it.description || null,
         category: it.category || null,
         sold_out: it.sold_out,
+        dietary: it.dietary,
       }))
   );
 }
@@ -68,12 +71,21 @@ export default function AdminMenuBuilder({ truck }: { truck: Truck }) {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
   const deleteItem = (id: string) => setItems((prev) => prev.filter((it) => it.id !== id));
 
+  const toggleDietary = (id: string, tag: DietaryTagId) =>
+    setItems((prev) =>
+      prev.map((it) =>
+        it.id === id
+          ? { ...it, dietary: it.dietary.includes(tag) ? it.dietary.filter((t) => t !== tag) : [...it.dietary, tag] }
+          : it
+      )
+    );
+
   const addDish = (cat: string) => {
     const d = draftFor(cat);
     if (!d.name.trim()) return;
     setItems((prev) => [
       ...prev,
-      { id: uid(), name: d.name.trim(), description: d.description.trim(), price: d.price.trim(), category: cat, sold_out: false },
+      { id: uid(), name: d.name.trim(), description: d.description.trim(), price: d.price.trim(), category: cat, sold_out: false, dietary: [] },
     ]);
     setDrafts((prev) => ({ ...prev, [cat]: { name: "", description: "", price: "" } }));
   };
@@ -136,6 +148,27 @@ export default function AdminMenuBuilder({ truck }: { truck: Truck }) {
                       placeholder="Short description"
                       className="w-full bg-transparent text-sm text-ink-soft outline-none placeholder:text-muted"
                     />
+                    <div className="flex flex-wrap gap-1 pt-0.5">
+                      {MENU_DIETARY_TAGS.map((tag) => {
+                        const active = it.dietary.includes(tag.id);
+                        return (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() => toggleDietary(it.id, tag.id)}
+                            className={cn(
+                              "rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide transition",
+                              active
+                                ? "border-transparent " + tag.className
+                                : "border-line text-muted hover:border-accent/40"
+                            )}
+                          >
+                            {tag.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                   <div className="relative flex-shrink-0">
                     <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 font-mono text-xs text-muted">

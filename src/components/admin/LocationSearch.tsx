@@ -59,7 +59,14 @@ export default function LocationSearch({ onSelect }: LocationSearchProps) {
               <button
                 type="button"
                 onClick={() => {
-                  onSelect({ name: r.place_name.split(",")[0], lat: r.center[1], lng: r.center[0] });
+                  // Full address (street + number + postal code + city), country
+                  // suffix trimmed since search is already restricted to Switzerland.
+                  const name = r.place_name
+                    .replace(/,\s*Switzerland$/i, "")
+                    .replace(/,\s*Schweiz$/i, "")
+                    .replace(/,\s*Suisse$/i, "")
+                    .trim();
+                  onSelect({ name, lat: r.center[1], lng: r.center[0] });
                   setQuery(r.place_name);
                   setOpen(false);
                 }}

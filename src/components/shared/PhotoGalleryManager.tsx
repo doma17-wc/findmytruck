@@ -1,25 +1,48 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, ImagePlus, Loader2, X } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import type { TruckPhoto } from "@/lib/types";
+import { ChevronLeft, ChevronRight, ImagePlus, Loader2, Star, X } from "lucide-react";
 import { resizeImage } from "@/lib/imageResize";
-import { PHOTO_BUCKET, storagePathFromPublicUrl } from "@/lib/storage";
-import {
-  addOwnPhotoAction,
-  deleteOwnPhotoAction,
-  reorderOwnPhotosAction,
-} from "@/app/dashboard/actions";
 
-export default function DashboardPhotoUploader({
+function cn(...parts: Array<string | false | null | undefined>): string {
+  return parts.filter(Boolean).join(" ");
+}
+
+export interface GalleryPhoto {
+  id: string;
+  url: string;
+  caption: string | null;
+}
+
+interface PhotoGalleryManagerProps {
+  truckId: string;
+  photos: GalleryPhoto[];
+  /** Resize + upload one file to storage under this truck; returns the public URL. */
+  uploadToStorage: (truckId: string, file: File) => Promise<string>;
+  /** Best-effort client-side storage cleanup after a delete (server already removed it). */
+  removeFromStorage?: (url: string) => Promise<void>;
+  onAdd: (url: string) => Promise<void> | void;
+  onDelete: (photoId: string) => Promise<void> | void;
+  onReorder: (orderedIds: string[]) => Promise<void> | void;
+  onSetCover: (photoId: string) => Promise<void> | void;
+}
+
+/**
+ * One unified drag-and-drop photo gallery: multi-upload, drag-to-reorder,
+ * "set as cover" (moves a photo to the front), delete. The FIRST photo is
+ * always the cover — callers keep `trucks.cover_photo_url` in sync with it.
+ */
+export default function PhotoGalleryManager({
   truckId,
   photos,
-}: {
-  truckId: string;
-  photos: TruckPhoto[];
-}) {
-  const [items, setItems] = useState<TruckPhoto[]>(photos);
+  uploadToStorage,
+  removeFromStorage,
+  onAdd,
+  onDelete,
+  onReorder,
+  onSetCover,
+}: PhotoGalleryManagerProps) {
+  const [items, setItems] = useState<GalleryPhoto[]>(photos);
   const [uploading, setUploading] = useState(0);
   const [dragOver, setDragOver] = useState(false);
   const [dragFrom, setDragFrom] = useState<number | null>(null);
@@ -35,18 +58,12 @@ export default function DashboardPhotoUploader({
 
   const uploadOne = async (file: File) => {
     if (!file.type.startsWith("image/")) return;
-    const supabase = createClient();
-    const { blob, ext, contentType } = await resizeImage(file, 1600);
-    const path = `${truckId}/gallery-${crypto.randomUUID()}.${ext}`;
-    const { error: uploadError } = await supabase.storage
-      .from(PHOTO_BUCKET)
-      .upload(path, blob, { cacheControl: "3600", upsert: false, contentType });
-    if (uploadError) {
-      setError(`Upload failed: ${uploadError.message}`);
-      return;
+    try {
+      const url = await uploadToStorage(truckId, file);
+      await onAdd(url);
+    } catch (err) {
+      setError(`Upload failed: ${err instanceof Error ? err.message : "unknown error"}`);
     }
-    const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
-    await addOwnPhotoAction(data.publicUrl, "");
   };
 
   const handleFiles = async (files: FileList | File[]) => {
@@ -64,9 +81,9 @@ export default function DashboardPhotoUploader({
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const persistOrder = (next: TruckPhoto[]) => {
+  const persistOrder = (next: GalleryPhoto[]) => {
     setItems(next);
-    void reorderOwnPhotosAction(next.map((p) => p.id));
+    void onReorder(next.map((p) => p.id));
   };
 
   const move = (from: number, to: number) => {
@@ -77,16 +94,23 @@ export default function DashboardPhotoUploader({
     persistOrder(next);
   };
 
-  const handleDelete = async (photo: TruckPhoto) => {
+  const makeCover = (idx: number) => {
+    if (idx === 0) return;
+    const next = [...items];
+    const [moved] = next.splice(idx, 1);
+    next.unshift(moved);
+    setItems(next);
+    void onSetCover(items[idx].id);
+  };
+
+  const handleDelete = async (photo: GalleryPhoto) => {
     setItems((prev) => prev.filter((p) => p.id !== photo.id));
-    await deleteOwnPhotoAction(photo.id);
-    // storage object is cleaned up server-side; also try client-side as a fallback
-    const path = storagePathFromPublicUrl(photo.url);
-    if (path) {
+    await onDelete(photo.id);
+    if (removeFromStorage) {
       try {
-        await createClient().storage.from(PHOTO_BUCKET).remove([path]);
+        await removeFromStorage(photo.url);
       } catch {
-        /* ignore */
+        /* best effort */
       }
     }
   };
@@ -104,11 +128,12 @@ export default function DashboardPhotoUploader({
           setDragOver(false);
           if (e.dataTransfer.files?.length) void handleFiles(e.dataTransfer.files);
         }}
-        className={`flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed px-4 py-7 text-center transition ${
+        className={cn(
+          "flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed px-4 py-7 text-center transition",
           dragOver
             ? "border-brand bg-brand-50"
             : "border-neutral-300 bg-neutral-50 hover:border-neutral-400 hover:bg-neutral-100"
-        }`}
+        )}
       >
         {uploading > 0 ? (
           <Loader2 className="h-5 w-5 animate-spin text-neutral-500" />
@@ -136,7 +161,9 @@ export default function DashboardPhotoUploader({
 
       {items.length > 0 && (
         <>
-          <p className="mt-3 text-xs text-neutral-400">Drag to reorder — first photo shows first on your profile.</p>
+          <p className="mt-3 text-xs text-neutral-400">
+            Drag to reorder, or tap the star to set a cover photo — the first photo shows first on your profile.
+          </p>
           <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
             {items.map((photo, idx) => (
               <div
@@ -153,12 +180,33 @@ export default function DashboardPhotoUploader({
                   if (dragFrom !== null && dragFrom !== idx) move(dragFrom, idx);
                   setDragFrom(null);
                 }}
-                className={`group relative aspect-square overflow-hidden rounded-xl bg-neutral-100 ${
-                  dragFrom === idx ? "opacity-40" : ""
-                }`}
+                className={cn(
+                  "group relative aspect-square overflow-hidden rounded-xl bg-neutral-100",
+                  dragFrom === idx && "opacity-40"
+                )}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photo.url} alt={photo.caption ?? ""} className="h-full w-full cursor-grab object-cover active:cursor-grabbing" />
+                <img
+                  src={photo.url}
+                  alt={photo.caption ?? ""}
+                  className="h-full w-full cursor-grab object-cover active:cursor-grabbing"
+                />
+
+                {idx === 0 ? (
+                  <span className="absolute left-1 top-1 flex items-center gap-1 rounded-full bg-brand px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow">
+                    <Star className="h-3 w-3 fill-current" /> Cover
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => makeCover(idx)}
+                    aria-label="Set as cover photo"
+                    title="Set as cover photo"
+                    className="absolute left-1 top-1 flex h-6 w-6 items-center justify-center rounded-full bg-black/60 text-white opacity-0 backdrop-blur-sm transition hover:bg-black/80 group-hover:opacity-100"
+                  >
+                    <Star className="h-3.5 w-3.5" />
+                  </button>
+                )}
 
                 <button
                   type="button"

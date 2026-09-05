@@ -84,9 +84,9 @@ export async function saveTruckAction(
     cuisine_type: csv("cuisine_type"),
     price_range: String(formData.get("price_range") ?? "") || null,
     logo_url: String(formData.get("logo_url") ?? "") || null,
-    cover_photo_url: String(formData.get("cover_photo_url") ?? "") || null,
+    // cover_photo_url is owned by the photo gallery (synced by syncCoverPhoto
+    // in the PHOTOS section below) — never overwritten from this form.
     menu_text: String(formData.get("menu_text") ?? "") || null,
-    menu_photo_url: String(formData.get("menu_photo_url") ?? "") || null,
     instagram: String(formData.get("instagram") ?? "") || null,
     tiktok: String(formData.get("tiktok") ?? "") || null,
     website: String(formData.get("website") ?? "") || null,
@@ -325,6 +325,21 @@ export async function deleteScheduleAction(truckId: string, scheduleId: string) 
 }
 
 // ---------- Photos ----------
+// One unified gallery — the first photo (sort_order 0) is always the cover;
+// trucks.cover_photo_url is kept in sync so every existing reader (map pins,
+// DetailSheet hero, JSON-LD, OG image) needs no changes. See PhotoGalleryManager.
+
+async function syncCoverPhoto(truckId: string) {
+  const { data: first } = await supabase
+    .from("truck_photos")
+    .select("url")
+    .eq("truck_id", truckId)
+    .order("sort_order", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  await supabase.from("trucks").update({ cover_photo_url: first?.url ?? null }).eq("id", truckId);
+}
 
 export async function addPhotoAction(truckId: string, url: string, caption: string) {
   const { count } = await supabase
@@ -339,12 +354,53 @@ export async function addPhotoAction(truckId: string, url: string, caption: stri
     sort_order: count ?? 0,
   });
 
+  await syncCoverPhoto(truckId);
   revalidatePath(`/admin/trucks/${truckId}`);
+  revalidatePublic();
 }
 
 export async function deletePhotoAction(truckId: string, photoId: string) {
   await supabase.from("truck_photos").delete().eq("id", photoId);
+  await syncCoverPhoto(truckId);
   revalidatePath(`/admin/trucks/${truckId}`);
+  revalidatePublic();
+}
+
+export async function reorderPhotoAction(truckId: string, orderedIds: string[]) {
+  await Promise.all(
+    orderedIds.map((id, index) =>
+      supabase.from("truck_photos").update({ sort_order: index }).eq("id", id).eq("truck_id", truckId)
+    )
+  );
+  await syncCoverPhoto(truckId);
+  revalidatePath(`/admin/trucks/${truckId}`);
+  revalidatePublic();
+}
+
+/** Move one photo to the front (sort_order 0) — used by "Set as cover". */
+export async function setCoverPhotoAction(truckId: string, photoId: string) {
+  const { data: rows } = await supabase
+    .from("truck_photos")
+    .select("id")
+    .eq("truck_id", truckId)
+    .order("sort_order", { ascending: true });
+
+  const ordered = (rows ?? []).map((r) => r.id);
+  const idx = ordered.indexOf(photoId);
+  if (idx > 0) {
+    ordered.splice(idx, 1);
+    ordered.unshift(photoId);
+  }
+
+  await Promise.all(
+    ordered.map((id, index) =>
+      supabase.from("truck_photos").update({ sort_order: index }).eq("id", id).eq("truck_id", truckId)
+    )
+  );
+
+  await syncCoverPhoto(truckId);
+  revalidatePath(`/admin/trucks/${truckId}`);
+  revalidatePublic();
 }
 
 // ---------- QR codes ----------
