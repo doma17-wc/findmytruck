@@ -7,6 +7,7 @@ import { geocode } from "@/lib/geocode";
 import { getMondayFirstDay } from "@/lib/geo";
 import { DEFAULT_MAP_CENTER } from "@/lib/cities";
 import { PHOTO_BUCKET, storagePathFromPublicUrl } from "@/lib/storage";
+import type { ScheduleFrequency } from "@/lib/types";
 
 async function requireOwnTruckId(): Promise<string> {
   const supabase = createClient();
@@ -118,6 +119,12 @@ export interface TourDayInput {
   /** Coordinates already known for this location (skip re-geocoding). */
   lat: number | null;
   lng: number | null;
+  /** How often this day repeats. Defaults to "weekly" (every week, unchanged). */
+  frequency: ScheduleFrequency;
+  /** Only used when frequency = "alternate". */
+  frequencyParity: "even" | "odd" | null;
+  /** Only used when frequency = "monthly_weeks" -- which occurrence(s) (1-4). */
+  frequencyWeeks: number[] | null;
 }
 
 /** Clamp a "HH:MM" (or "H:MM") string to a valid 24h time, default on garbage input. */
@@ -142,6 +149,9 @@ export async function publishTourAction(days: TourDayInput[]): Promise<ActionRes
     start_time: string;
     end_time: string;
     is_recurring: boolean;
+    frequency: ScheduleFrequency;
+    frequency_parity: "even" | "odd" | null;
+    frequency_weeks: number[] | null;
   }[] = [];
 
   for (const d of days) {
@@ -164,6 +174,12 @@ export async function publishTourAction(days: TourDayInput[]): Promise<ActionRes
       }
     }
 
+    const frequency: ScheduleFrequency = ["weekly", "alternate", "monthly_weeks"].includes(
+      d.frequency
+    )
+      ? d.frequency
+      : "weekly";
+
     rows.push({
       truck_id: truckId,
       day_of_week: Math.min(6, Math.max(0, Math.round(d.day))),
@@ -173,6 +189,12 @@ export async function publishTourAction(days: TourDayInput[]): Promise<ActionRes
       start_time: clampTime(d.startTime, "11:00"),
       end_time: clampTime(d.endTime, "14:00"),
       is_recurring: true,
+      frequency,
+      frequency_parity: frequency === "alternate" ? d.frequencyParity ?? "odd" : null,
+      frequency_weeks:
+        frequency === "monthly_weeks"
+          ? (d.frequencyWeeks ?? []).filter((w) => w >= 1 && w <= 4)
+          : null,
     });
   }
 
@@ -381,6 +403,105 @@ export async function reorderOwnPhotosAction(orderedIds: string[]) {
 
   await syncCoverPhoto(supabase, truckId);
   revalidateEverywhere();
+}
+
+/* ------------------------------------------------------------------ *
+ * EVENTS  (one-off dated appearances, separate from the weekly schedule —
+ * an owner's event always auto-links to their own truck via event_trucks.)
+ * ------------------------------------------------------------------ */
+
+export interface EventInput {
+  name: string;
+  description: string;
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string;
+  startTime: string; // "HH:MM"
+  endTime: string;
+  location: string;
+  lat: number | null;
+  lng: number | null;
+  link: string;
+}
+
+function revalidateEvents() {
+  revalidateEverywhere();
+  revalidatePath("/events");
+}
+
+export async function saveOwnEventAction(
+  eventId: string | null,
+  input: EventInput
+): Promise<ActionResult> {
+  const truckId = await requireOwnTruckId();
+  const supabase = createClient();
+
+  const name = input.name.trim();
+  const location = input.location.trim();
+  if (!name) return { error: "Event name is required." };
+  if (!location) return { error: "Location is required." };
+  if (!input.startDate || !input.endDate) return { error: "Start and end date are required." };
+  if (input.endDate < input.startDate) return { error: "End date can't be before the start date." };
+
+  let lat = typeof input.lat === "number" && Number.isFinite(input.lat) ? input.lat : null;
+  let lng = typeof input.lng === "number" && Number.isFinite(input.lng) ? input.lng : null;
+  if (lat === null || lng === null) {
+    const geo = await geocode(location);
+    if (geo) {
+      lat = geo.lat;
+      lng = geo.lng;
+    } else {
+      lat = DEFAULT_MAP_CENTER[1];
+      lng = DEFAULT_MAP_CENTER[0];
+    }
+  }
+
+  const payload = {
+    name,
+    description: input.description.trim() || null,
+    start_date: input.startDate,
+    end_date: input.endDate,
+    start_time: input.startTime ? clampTime(input.startTime, "11:00") : null,
+    end_time: input.endTime ? clampTime(input.endTime, "18:00") : null,
+    location_name: location,
+    location_lat: lat,
+    location_lng: lng,
+    link: input.link.trim() || null,
+    created_by_truck_id: truckId,
+  };
+
+  if (eventId) {
+    const { error } = await supabase
+      .from("events")
+      .update(payload)
+      .eq("id", eventId)
+      .eq("created_by_truck_id", truckId);
+    if (error) return { error: error.message };
+  } else {
+    const { data, error } = await supabase.from("events").insert(payload).select("id").single();
+    if (error) return { error: error.message };
+    const { error: linkError } = await supabase
+      .from("event_trucks")
+      .insert({ event_id: data.id, truck_id: truckId });
+    if (linkError) return { error: linkError.message };
+  }
+
+  revalidateEvents();
+  return { success: true };
+}
+
+export async function deleteOwnEventAction(eventId: string): Promise<ActionResult> {
+  const truckId = await requireOwnTruckId();
+  const supabase = createClient();
+
+  const { error } = await supabase
+    .from("events")
+    .delete()
+    .eq("id", eventId)
+    .eq("created_by_truck_id", truckId);
+  if (error) return { error: error.message };
+
+  revalidateEvents();
+  return { success: true };
 }
 
 /** Move one photo to the front (sort_order 0) — used by "Set as cover". */

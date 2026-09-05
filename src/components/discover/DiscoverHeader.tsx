@@ -32,6 +32,12 @@ export default function DiscoverHeader({ auth }: DiscoverHeaderProps) {
           >
             Browse all
           </Link>
+          <Link
+            href="/events"
+            className="text-sm font-medium text-ink-soft transition hover:text-brand"
+          >
+            Events
+          </Link>
           {isOwner ? (
             <Link
               href="/dashboard"

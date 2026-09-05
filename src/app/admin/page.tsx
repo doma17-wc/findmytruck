@@ -2,6 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { getServiceSupabase } from "@/lib/supabase/admin";
 import { readBoost, isBoostActive } from "@/lib/geo";
 import type { Truck, QrRedirect } from "@/lib/types";
+import { getAllUpcomingEvents } from "@/lib/events";
 import AdminApp, { type AdminTruck, type AdminUser } from "@/components/admin/AdminApp";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +31,7 @@ export default async function AdminDashboardPage() {
     reviewsRes,
     { data: impressionRows },
     { data: viewRows },
+    events,
   ] = await Promise.all([
     supabase.from("trucks").select("*").order("created_at", { ascending: false }),
     supabase.from("qr_redirects").select("truck_id, scan_count"),
@@ -42,6 +44,7 @@ export default async function AdminDashboardPage() {
       .from("truck_page_views")
       .select("truck_id")
       .gte("viewed_at", thirtyDaysAgo.toISOString()),
+    getAllUpcomingEvents(),
   ]);
 
   const scansByTruck = new Map<string, number>();
@@ -109,5 +112,5 @@ export default async function AdminDashboardPage() {
     users.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   }
 
-  return <AdminApp trucks={trucks} users={users} hasServiceRole={Boolean(service)} />;
+  return <AdminApp trucks={trucks} users={users} events={events} hasServiceRole={Boolean(service)} />;
 }

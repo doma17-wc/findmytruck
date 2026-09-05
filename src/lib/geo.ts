@@ -122,6 +122,39 @@ export function confirmedAgo(startedAt: Date | null, now: Date = new Date()): st
   return m ? `Confirmed ${h}h ${m}m ago` : `Confirmed ${h}h ago`;
 }
 
+/** ISO-8601 week number (1-53) for a date, matching the "even/odd week" the
+ *  frequency system talks about. */
+export function getISOWeek(date: Date): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7; // Mon=1 .. Sun=7
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+/** Which occurrence (1-based) of its weekday this date is within its month,
+ *  e.g. the third Friday of the month returns 3. */
+export function occurrenceOfWeekdayInMonth(date: Date): number {
+  return Math.ceil(date.getDate() / 7);
+}
+
+/** Whether a (possibly non-weekly) recurring schedule row actually runs on
+ *  `date`. Dated rows (`specific_date` set) are handled by the caller and
+ *  always occur on their one date -- this only covers the recurring-frequency
+ *  cases layered on top of the plain weekly match. */
+function occursOn(schedule: TruckSchedule, date: Date): boolean {
+  const frequency = schedule.frequency ?? "weekly";
+  if (frequency === "alternate") {
+    const parity = getISOWeek(date) % 2 === 0 ? "even" : "odd";
+    return parity === (schedule.frequency_parity ?? "odd");
+  }
+  if (frequency === "monthly_weeks") {
+    const weeks = schedule.frequency_weeks ?? [];
+    return weeks.includes(occurrenceOfWeekdayInMonth(date));
+  }
+  return true;
+}
+
 /** A truck's schedule slot that is active at `now` (recurring or dated). */
 function activeSlot(schedules: TruckSchedule[], now: Date): TruckSchedule | null {
   const todayIdx = getMondayFirstDay(now);
@@ -131,40 +164,36 @@ function activeSlot(schedules: TruckSchedule[], now: Date): TruckSchedule | null
   return (
     schedules.find((s) => {
       if (s.start_time === s.end_time) return false; // region-marker placeholder
-      const onToday = s.specific_date ? s.specific_date === todayISO : s.day_of_week === todayIdx;
+      const onToday = s.specific_date
+        ? s.specific_date === todayISO
+        : s.day_of_week === todayIdx && occursOn(s, now);
       return onToday && isNowWithin(s.start_time, s.end_time, now);
     }) ?? null
   );
 }
 
-/** The soonest recurring slot from `now` onward, with how many days away it is. */
+/** The soonest recurring slot from `now` onward, with how many days away it is.
+ *  Scans forward day-by-day (rather than assuming "same weekday next week" is
+ *  always valid) since alternate/monthly-week frequencies mean a matching
+ *  weekday doesn't necessarily occur every week. */
 function nextSlot(
   schedules: TruckSchedule[],
   now: Date
 ): { schedule: TruckSchedule; daysAhead: number } | null {
-  const todayIdx = getMondayFirstDay(now);
   const nowMinutes = now.getHours() * 60 + now.getMinutes();
   const weekly = schedules.filter((s) => s.start_time !== s.end_time && s.specific_date == null);
+  if (weekly.length === 0) return null;
 
-  const laterToday = weekly
-    .filter((s) => s.day_of_week === todayIdx && timeToMinutes(s.start_time) > nowMinutes)
-    .sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time))[0];
-  if (laterToday) return { schedule: laterToday, daysAhead: 0 };
-
-  let best: { schedule: TruckSchedule; daysAhead: number } | null = null;
-  for (const s of weekly) {
-    let daysAhead = (s.day_of_week - todayIdx + 7) % 7;
-    if (daysAhead === 0) daysAhead = 7; // today's slots already ended
-    if (
-      !best ||
-      daysAhead < best.daysAhead ||
-      (daysAhead === best.daysAhead &&
-        timeToMinutes(s.start_time) < timeToMinutes(best.schedule.start_time))
-    ) {
-      best = { schedule: s, daysAhead };
-    }
+  for (let daysAhead = 0; daysAhead <= 35; daysAhead++) {
+    const candidate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + daysAhead);
+    const candidateDow = getMondayFirstDay(candidate);
+    const matches = weekly
+      .filter((s) => s.day_of_week === candidateDow && occursOn(s, candidate))
+      .filter((s) => daysAhead > 0 || timeToMinutes(s.start_time) > nowMinutes)
+      .sort((a, b) => timeToMinutes(a.start_time) - timeToMinutes(b.start_time));
+    if (matches.length > 0) return { schedule: matches[0], daysAhead };
   }
-  return best;
+  return null;
 }
 
 function hhmm(d: Date): string {

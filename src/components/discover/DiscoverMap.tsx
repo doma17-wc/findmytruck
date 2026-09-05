@@ -45,6 +45,7 @@ interface PinMeta {
   boosted: boolean;
   unclaimed: boolean;
   iconOpacity: string;
+  hasEvent: boolean;
 }
 
 interface DiscoverMapProps {
@@ -78,6 +79,7 @@ export default function DiscoverMap({
   // and its positioning classes onto it every frame; reassigning className there
   // strips `.mapboxgl-marker` and the pins fall out of the map's coordinate space).
   const pinElsRef = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const badgeElsRef = useRef<Map<string, HTMLSpanElement>>(new Map());
   const metaRef = useRef<Map<string, PinMeta>>(new Map());
   const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const didAutoFitRef = useRef(false);
@@ -112,6 +114,7 @@ export default function DiscoverMap({
       mapRef.current = null;
       markersRef.current.clear();
       pinElsRef.current.clear();
+      badgeElsRef.current.clear();
       metaRef.current.clear();
       userMarkerRef.current = null;
       didAutoFitRef.current = false;
@@ -156,12 +159,13 @@ export default function DiscoverMap({
         marker.remove();
         markersRef.current.delete(id);
         pinElsRef.current.delete(id);
+        badgeElsRef.current.delete(id);
         metaRef.current.delete(id);
       }
     }
 
     entries.forEach((entry) => {
-      const { truck, status, coord } = entry;
+      const { truck, status, coord, activeEvent } = entry;
       const unclaimed = isUnclaimed(truck);
       const boosted = status.tier === "boosted";
       const meta: PinMeta = {
@@ -170,6 +174,7 @@ export default function DiscoverMap({
         boosted,
         unclaimed,
         iconOpacity: unclaimed ? "0.55" : "1",
+        hasEvent: Boolean(activeEvent),
       };
       metaRef.current.set(truck.id, meta);
 
@@ -192,6 +197,13 @@ export default function DiscoverMap({
         el.addEventListener("mouseenter", () => onHover(truck.id));
         el.addEventListener("mouseleave", () => onHover(null));
         wrapper.appendChild(el);
+
+        const badge = document.createElement("span");
+        badge.className = "fmt-event-badge";
+        badge.textContent = "🎪";
+        badge.hidden = true;
+        wrapper.appendChild(badge);
+        badgeElsRef.current.set(truck.id, badge);
 
         marker = new mapboxgl.Marker({ element: wrapper }).setLngLat(coord).addTo(map);
         markersRef.current.set(truck.id, marker);
@@ -248,6 +260,8 @@ export default function DiscoverMap({
     el.style.border = `3px solid ${selected ? "#FF6A00" : meta.border}`;
     const inner = el.firstElementChild as HTMLElement | null;
     if (inner) inner.style.opacity = meta.iconOpacity;
+    const badge = badgeElsRef.current.get(id);
+    if (badge) badge.hidden = !meta.hasEvent;
     // z-index belongs on the Mapbox-owned wrapper so pins stack against each
     // other; the wrapper's other styles (position, transform) are left alone.
     marker.getElement().style.zIndex = selected ? "6" : hovered ? "4" : "1";

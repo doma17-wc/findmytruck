@@ -57,6 +57,8 @@ export interface Truck extends PublicTruck {
   owner_email: string | null;
 }
 
+export type ScheduleFrequency = "weekly" | "alternate" | "monthly_weeks";
+
 export interface TruckSchedule {
   id: string;
   truck_id: string;
@@ -69,6 +71,43 @@ export interface TruckSchedule {
   is_recurring: boolean;
   specific_date: string | null;
   notes: string | null;
+  /** Frequency system (migration 0011). May be absent on rows read before that
+   *  migration -- always fall back to "weekly" (every week, unchanged). */
+  frequency?: ScheduleFrequency | null;
+  /** Only set when frequency = "alternate": which ISO-week parity this stop runs on. */
+  frequency_parity?: "even" | "odd" | null;
+  /** Only set when frequency = "monthly_weeks": which occurrence(s) (1-4) of
+   *  that weekday in the month this stop runs on. */
+  frequency_weeks?: number[] | null;
+}
+
+/** Events system (migration 0011): one-off dated appearances, separate from
+ *  the recurring weekly schedule. */
+export interface FmtEvent {
+  id: string;
+  name: string;
+  description: string | null;
+  start_date: string; // "YYYY-MM-DD"
+  end_date: string;
+  start_time: string | null; // "HH:MM:SS"
+  end_time: string | null;
+  location_name: string;
+  location_lat: number;
+  location_lng: number;
+  link: string | null;
+  created_by_truck_id: string | null;
+  created_at: string;
+}
+
+export interface EventTruckRef {
+  id: string;
+  slug: string;
+  name: string;
+}
+
+/** An event with the trucks attending it attached (many-to-many via `event_trucks`). */
+export interface EventWithTrucks extends FmtEvent {
+  trucks: EventTruckRef[];
 }
 
 export interface TruckPhoto {

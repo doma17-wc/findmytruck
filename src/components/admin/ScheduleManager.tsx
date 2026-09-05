@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { TruckSchedule } from "@/lib/types";
+import type { ScheduleFrequency, TruckSchedule } from "@/lib/types";
 import { DAY_LABELS } from "@/lib/types";
 import { saveScheduleAction, deleteScheduleAction } from "@/app/admin/actions";
 import LocationSearch from "./LocationSearch";
@@ -22,6 +22,9 @@ interface DraftEntry {
   location_lng: number | null;
   start_time: string;
   end_time: string;
+  frequency: ScheduleFrequency;
+  frequency_parity: "even" | "odd";
+  frequency_weeks: number[];
 }
 
 const emptyDraft: DraftEntry = {
@@ -31,7 +34,27 @@ const emptyDraft: DraftEntry = {
   location_lng: null,
   start_time: "11:30",
   end_time: "14:00",
+  frequency: "weekly",
+  frequency_parity: "odd",
+  frequency_weeks: [],
 };
+
+const FREQUENCY_OPTIONS: { key: ScheduleFrequency; label: string }[] = [
+  { key: "weekly", label: "Every week" },
+  { key: "alternate", label: "Alternating" },
+  { key: "monthly_weeks", label: "Monthly" },
+];
+
+function frequencyLabel(s: TruckSchedule): string | null {
+  const frequency = s.frequency ?? "weekly";
+  if (frequency === "alternate") return `Alternating (${s.frequency_parity ?? "odd"} weeks)`;
+  if (frequency === "monthly_weeks") {
+    const weeks = s.frequency_weeks ?? [];
+    if (weeks.length === 0) return null;
+    return `Monthly: ${weeks.map((w) => `${w}${["", "st", "nd", "rd"][w] ?? "th"}`).join(", ")}`;
+  }
+  return null;
+}
 
 export default function ScheduleManager({ truckId, schedules }: ScheduleManagerProps) {
   const [draft, setDraft] = useState<DraftEntry>(emptyDraft);
@@ -51,6 +74,11 @@ export default function ScheduleManager({ truckId, schedules }: ScheduleManagerP
     fd.set("start_time", draft.start_time);
     fd.set("end_time", draft.end_time);
     fd.set("is_recurring", "on");
+    fd.set("frequency", draft.frequency);
+    if (draft.frequency === "alternate") fd.set("frequency_parity", draft.frequency_parity);
+    if (draft.frequency === "monthly_weeks") {
+      for (const w of draft.frequency_weeks) fd.append("frequency_weeks", String(w));
+    }
     await saveScheduleAction(truckId, null, fd);
     setDraft(emptyDraft);
     setSubmitting(false);
@@ -83,6 +111,11 @@ export default function ScheduleManager({ truckId, schedules }: ScheduleManagerP
                       <span>
                         {e.start_time.slice(0, 5)} – {e.end_time.slice(0, 5)}
                       </span>
+                      {frequencyLabel(e) && (
+                        <span className="ml-1.5 rounded-full bg-accent/10 px-2 py-0.5 text-[11px] font-semibold text-accent-dark">
+                          {frequencyLabel(e)}
+                        </span>
+                      )}
                     </div>
                     <button
                       onClick={() => deleteScheduleAction(truckId, e.id)}
@@ -123,6 +156,70 @@ export default function ScheduleManager({ truckId, schedules }: ScheduleManagerP
               Selected: {draft.location_name} ({draft.location_lat.toFixed(4)}, {draft.location_lng!.toFixed(4)})
             </p>
           )}
+
+          <div>
+            <span className="mb-1 block text-xs font-medium text-neutral-500">Frequency</span>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex overflow-hidden rounded-lg border border-neutral-200 text-[11px] font-bold">
+                {FREQUENCY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.key}
+                    type="button"
+                    onClick={() => setDraft((d) => ({ ...d, frequency: opt.key }))}
+                    className={`px-2.5 py-1.5 transition ${
+                      draft.frequency === opt.key ? "bg-neutral-900 text-white" : "bg-white text-neutral-500"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+
+              {draft.frequency === "alternate" && (
+                <div className="inline-flex overflow-hidden rounded-lg border border-neutral-200 text-[11px] font-bold">
+                  {(["odd", "even"] as const).map((p) => (
+                    <button
+                      key={p}
+                      type="button"
+                      onClick={() => setDraft((d) => ({ ...d, frequency_parity: p }))}
+                      className={`px-2.5 py-1.5 capitalize transition ${
+                        draft.frequency_parity === p ? "bg-accent text-white" : "bg-white text-neutral-500"
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {draft.frequency === "monthly_weeks" && (
+                <div className="inline-flex overflow-hidden rounded-lg border border-neutral-200 text-[11px] font-bold">
+                  {[1, 2, 3, 4].map((n) => {
+                    const active = draft.frequency_weeks.includes(n);
+                    return (
+                      <button
+                        key={n}
+                        type="button"
+                        onClick={() =>
+                          setDraft((d) => ({
+                            ...d,
+                            frequency_weeks: active
+                              ? d.frequency_weeks.filter((w) => w !== n)
+                              : [...d.frequency_weeks, n].sort(),
+                          }))
+                        }
+                        className={`px-2.5 py-1.5 transition ${
+                          active ? "bg-accent text-white" : "bg-white text-neutral-500"
+                        }`}
+                      >
+                        {n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : "4th"}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">

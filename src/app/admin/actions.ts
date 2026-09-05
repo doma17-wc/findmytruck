@@ -296,6 +296,15 @@ export async function saveScheduleAction(
   scheduleId: string | null,
   formData: FormData
 ) {
+  const frequencyRaw = String(formData.get("frequency") ?? "weekly");
+  const frequency = ["weekly", "alternate", "monthly_weeks"].includes(frequencyRaw)
+    ? frequencyRaw
+    : "weekly";
+  const frequencyWeeks = formData
+    .getAll("frequency_weeks")
+    .map((v) => Number(v))
+    .filter((n) => n >= 1 && n <= 4);
+
   const payload = {
     truck_id: truckId,
     day_of_week: Number(formData.get("day_of_week")),
@@ -306,6 +315,9 @@ export async function saveScheduleAction(
     end_time: String(formData.get("end_time")),
     is_recurring: formData.get("is_recurring") === "on",
     notes: String(formData.get("notes") ?? "") || null,
+    frequency,
+    frequency_parity: frequency === "alternate" ? String(formData.get("frequency_parity") ?? "odd") : null,
+    frequency_weeks: frequency === "monthly_weeks" ? frequencyWeeks : null,
   };
 
   if (scheduleId) {
@@ -322,6 +334,91 @@ export async function deleteScheduleAction(truckId: string, scheduleId: string) 
   await supabase.from("truck_schedules").delete().eq("id", scheduleId);
   revalidatePath(`/admin/trucks/${truckId}`);
   revalidatePublic();
+}
+
+// ---------- Events ----------
+// A "general" event (no single created_by_truck_id) can have many trucks
+// linked via event_trucks -- e.g. a street food festival. A per-truck event
+// created from that truck's admin page auto-links to just that truck.
+
+export interface EventFormResult {
+  error?: string;
+  id?: string;
+}
+
+function revalidateEvents(truckId?: string | null) {
+  revalidatePublic();
+  revalidatePath("/events");
+  if (truckId) revalidatePath(`/admin/trucks/${truckId}`);
+}
+
+export async function saveEventAction(
+  eventId: string | null,
+  formData: FormData
+): Promise<EventFormResult> {
+  const name = String(formData.get("name") ?? "").trim();
+  if (!name) return { error: "Name is required." };
+  const startDate = String(formData.get("start_date") ?? "");
+  if (!startDate) return { error: "Start date is required." };
+  const endDate = String(formData.get("end_date") ?? "") || startDate;
+
+  const createdByTruckId = String(formData.get("created_by_truck_id") ?? "") || null;
+
+  const payload = {
+    name,
+    description: String(formData.get("description") ?? "") || null,
+    start_date: startDate,
+    end_date: endDate,
+    start_time: String(formData.get("start_time") ?? "") || null,
+    end_time: String(formData.get("end_time") ?? "") || null,
+    location_name: String(formData.get("location_name") ?? ""),
+    location_lat: Number(formData.get("location_lat")),
+    location_lng: Number(formData.get("location_lng")),
+    link: String(formData.get("link") ?? "") || null,
+    created_by_truck_id: createdByTruckId,
+  };
+
+  if (eventId) {
+    const { error } = await supabase.from("events").update(payload).eq("id", eventId);
+    if (error) return { error: error.message };
+    revalidateEvents(createdByTruckId);
+    return { id: eventId };
+  }
+
+  const { data, error } = await supabase.from("events").insert(payload).select("id").single();
+  if (error) return { error: error.message };
+
+  // Comma-separated truck ids to link immediately on create (the calling
+  // truck's own id from the per-truck manager, or a multi-select from admin).
+  const truckIds = String(formData.get("truck_ids") ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (truckIds.length > 0) {
+    await supabase
+      .from("event_trucks")
+      .insert(truckIds.map((truck_id) => ({ event_id: data.id, truck_id })));
+  }
+
+  revalidateEvents(createdByTruckId);
+  return { id: data.id };
+}
+
+/** Replace the full set of trucks linked to an event -- used by the general
+ * multi-truck picker in the admin Events tab. */
+export async function setEventTrucksAction(eventId: string, truckIds: string[]) {
+  await supabase.from("event_trucks").delete().eq("event_id", eventId);
+  if (truckIds.length > 0) {
+    await supabase
+      .from("event_trucks")
+      .insert(truckIds.map((truck_id) => ({ event_id: eventId, truck_id })));
+  }
+  revalidateEvents();
+}
+
+export async function deleteEventAction(eventId: string, truckId?: string | null) {
+  await supabase.from("events").delete().eq("id", eventId);
+  revalidateEvents(truckId);
 }
 
 // ---------- Photos ----------

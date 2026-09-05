@@ -2,9 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import type { Truck, TruckSchedule, TruckPhoto } from "@/lib/types";
+import { getEventsForTruck } from "@/lib/events";
 import TruckForm from "@/components/admin/TruckForm";
 import AdminMenuBuilder from "@/components/admin/AdminMenuBuilder";
 import ScheduleManager from "@/components/admin/ScheduleManager";
+import EventsManager from "@/components/admin/EventsManager";
 import AdminPhotoGallery from "@/components/admin/AdminPhotoGallery";
 import QrPanel from "@/components/admin/QrPanel";
 
@@ -20,7 +22,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default async function EditTruckPage({ params }: { params: { id: string } }) {
-  const [{ data: truck }, { data: schedules }, { data: photos }, { data: redirect }] =
+  const [{ data: truck }, { data: schedules }, { data: photos }, { data: redirect }, events] =
     await Promise.all([
       supabase.from("trucks").select("*").eq("id", params.id).maybeSingle(),
       supabase
@@ -34,6 +36,7 @@ export default async function EditTruckPage({ params }: { params: { id: string }
         .eq("truck_id", params.id)
         .order("sort_order", { ascending: true }),
       supabase.from("qr_redirects").select("*").eq("truck_id", params.id).maybeSingle(),
+      getEventsForTruck(params.id),
     ]);
 
   if (!truck) notFound();
@@ -64,6 +67,9 @@ export default async function EditTruckPage({ params }: { params: { id: string }
         </Section>
         <Section title="Weekly schedule">
           <ScheduleManager truckId={t.id} schedules={(schedules ?? []) as TruckSchedule[]} />
+        </Section>
+        <Section title="Events">
+          <EventsManager truckId={t.id} events={events} />
         </Section>
         <Section title="Photo gallery">
           <AdminPhotoGallery truckId={t.id} photos={(photos ?? []) as TruckPhoto[]} />

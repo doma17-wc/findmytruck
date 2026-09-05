@@ -9,9 +9,11 @@ import {
   ChevronRight,
   ExternalLink,
   Globe,
+  Link2,
   MapPin,
   Music2,
   Navigation,
+  PartyPopper,
   X,
 } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
@@ -37,6 +39,14 @@ interface DetailSheetProps {
   onClose: () => void;
 }
 
+function formatEventDate(start: string, end: string): string {
+  const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" };
+  const s = new Date(`${start}T00:00:00`).toLocaleDateString("en", opts);
+  if (start === end) return s;
+  const e = new Date(`${end}T00:00:00`).toLocaleDateString("en", opts);
+  return `${s} – ${e}`;
+}
+
 function socialUrl(kind: "instagram" | "tiktok", handle: string): string {
   if (handle.startsWith("http")) return handle;
   const h = handle.replace(/^@/, "");
@@ -51,7 +61,7 @@ export default function DetailSheet({
   isOwnerView,
   onClose,
 }: DetailSheetProps) {
-  const { truck, status, schedules, rating } = entry;
+  const { truck, status, schedules, rating, events } = entry;
   const unclaimed = isUnclaimed(truck);
   const menuItems = normalizeMenuItems(truck.menu_items);
   const pills = dietaryPills(truck.dietary_options ?? []);
@@ -431,6 +441,49 @@ export default function DetailSheet({
                     </div>
                   );
                 })}
+              </div>
+            </section>
+          )}
+
+          {/* Upcoming events */}
+          {events.length > 0 && (
+            <section className="mt-5">
+              <h3 className="font-display text-sm font-bold uppercase tracking-wider text-muted">
+                Upcoming events
+              </h3>
+              <div className="mt-2 space-y-2.5">
+                {events.map((e) => (
+                  <div key={e.id} className="rounded-2xl border border-accent/25 bg-accent/5 p-3.5">
+                    <div className="flex items-start gap-2">
+                      <PartyPopper className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-dark" />
+                      <div className="min-w-0">
+                        <p className="text-[13px] font-bold text-ink">{e.name}</p>
+                        <p className="mt-0.5 text-[12px] font-bold uppercase tracking-wide text-accent-dark">
+                          {formatEventDate(e.start_date, e.end_date)}
+                          {e.start_time && ` · ${e.start_time.slice(0, 5)}–${(e.end_time ?? "").slice(0, 5)}`}
+                        </p>
+                        <p className="mt-1 flex items-start gap-1 text-[13px] text-ink-soft">
+                          <MapPin className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-muted" />
+                          {e.location_name}
+                        </p>
+                        {e.description && (
+                          <p className="mt-1 text-[13px] text-ink-soft">{e.description}</p>
+                        )}
+                        {e.link && (
+                          <a
+                            href={e.link.startsWith("http") ? e.link : `https://${e.link}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="mt-1.5 inline-flex items-center gap-1 text-[12px] font-bold text-accent-dark hover:underline"
+                          >
+                            <Link2 className="h-3.5 w-3.5" />
+                            More details
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </section>
           )}

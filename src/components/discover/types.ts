@@ -1,4 +1,4 @@
-import type { PublicTruck, TruckSchedule } from "@/lib/types";
+import type { EventWithTrucks, PublicTruck, TruckSchedule } from "@/lib/types";
 import type { TruckStatus } from "@/lib/geo";
 
 export interface TruckRating {
@@ -17,6 +17,10 @@ export interface DiscoverEntry {
    *  usable location are filtered out upstream). */
   coord: [number, number];
   rating: TruckRating | null;
+  /** This truck's upcoming (incl. ongoing-today) events, soonest first. */
+  events: EventWithTrucks[];
+  /** Set when one of `events` is happening right now/today — drives the map badge. */
+  activeEvent: EventWithTrucks | null;
 }
 
 export type SortKey = "distance" | "rating" | "name";

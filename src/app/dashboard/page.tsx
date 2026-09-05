@@ -3,6 +3,7 @@ import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
 import type { Truck, TruckSchedule, TruckPhoto, Review } from "@/lib/types";
 import { normalizeMenuItems } from "@/lib/menu";
 import { getMondayFirstDay, readBoost, isBoostActive } from "@/lib/geo";
+import { getEventsForTruck } from "@/lib/events";
 import DashboardApp, { type DashboardStats } from "@/components/dashboard/DashboardApp";
 
 export const metadata = { title: "Dashboard" };
@@ -42,6 +43,7 @@ export default async function DashboardPage() {
     { data: viewRows },
     { data: favRows },
     { data: impressionRows },
+    events,
   ] = await Promise.all([
     supabase.from("trucks").select("*").eq("id", truckId).maybeSingle(),
     supabase.from("truck_schedules").select("*").eq("truck_id", truckId).order("day_of_week"),
@@ -62,6 +64,7 @@ export default async function DashboardPage() {
       .select("date, count")
       .eq("truck_id", truckId)
       .gte("date", fourteenDaysAgo),
+    getEventsForTruck(truckId, { upcomingOnly: true }),
   ]);
 
   if (!truck) redirect("/register-truck");
@@ -172,6 +175,7 @@ export default async function DashboardPage() {
       schedules={(schedules ?? []) as TruckSchedule[]}
       photos={(photos ?? []) as TruckPhoto[]}
       reviews={reviewList}
+      events={events}
       boosted={boosted}
       boostExpiresAt={boost.expiresAt ? boost.expiresAt.toISOString() : null}
       boostStartedAt={boost.startedAt ? boost.startedAt.toISOString() : null}

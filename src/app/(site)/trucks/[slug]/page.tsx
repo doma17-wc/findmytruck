@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BadgeCheck, Globe, MapPin, Music2, Navigation } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Globe, Link2, MapPin, Music2, Navigation, PartyPopper } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { getTruckBySlug, getTruckPhotos, getTruckSchedule } from "@/lib/data";
+import { getEventsForTruck } from "@/lib/events";
 import { DAY_LABELS, DAY_LABELS_SHORT } from "@/lib/types";
 import { normalizeMenuItems } from "@/lib/menu";
 import { isUnclaimed, UNCLAIMED_BADGE } from "@/lib/unclaimed";
@@ -19,6 +20,14 @@ export const revalidate = 300;
 
 interface PageProps {
   params: { slug: string };
+}
+
+function formatEventDate(start: string, end: string): string {
+  const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short" };
+  const s = new Date(`${start}T00:00:00`).toLocaleDateString("en", opts);
+  if (start === end) return s;
+  const e = new Date(`${end}T00:00:00`).toLocaleDateString("en", opts);
+  return `${s} – ${e}`;
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
@@ -57,10 +66,11 @@ export default async function TruckProfilePage({ params }: PageProps) {
   const truck = await getTruckBySlug(params.slug);
   if (!truck) notFound();
 
-  const [schedule, photos, auth] = await Promise.all([
+  const [schedule, photos, auth, events] = await Promise.all([
     getTruckSchedule(truck.id),
     getTruckPhotos(truck.id),
     getCurrentUserProfile(),
+    getEventsForTruck(truck.id, { upcomingOnly: true }),
   ]);
 
   const supabase = createClient();
@@ -338,6 +348,47 @@ export default async function TruckProfilePage({ params }: PageProps) {
               })}
             </div>
           </section>
+          )}
+
+          {events.length > 0 && (
+            <section className="mt-9">
+              <h2 className="text-lg font-bold text-neutral-900">Upcoming events</h2>
+              <div className="mt-3 space-y-3">
+                {events.map((e) => (
+                  <div
+                    key={e.id}
+                    className="flex items-start gap-3 rounded-2xl border border-brand-100 bg-brand-50/40 p-4 shadow-card"
+                  >
+                    <PartyPopper className="mt-0.5 h-5 w-5 flex-shrink-0 text-brand" />
+                    <div className="min-w-0">
+                      <p className="font-semibold text-neutral-900">{e.name}</p>
+                      <p className="mt-0.5 text-xs font-bold uppercase tracking-wide text-brand">
+                        {formatEventDate(e.start_date, e.end_date)}
+                        {e.start_time && ` · ${e.start_time.slice(0, 5)}–${(e.end_time ?? "").slice(0, 5)}`}
+                      </p>
+                      <p className="mt-1.5 flex items-start gap-1.5 text-sm text-neutral-600">
+                        <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-neutral-400" />
+                        {e.location_name}
+                      </p>
+                      {e.description && (
+                        <p className="mt-1.5 text-sm text-neutral-600">{e.description}</p>
+                      )}
+                      {e.link && (
+                        <a
+                          href={e.link.startsWith("http") ? e.link : `https://${e.link}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-brand hover:underline"
+                        >
+                          <Link2 className="h-4 w-4" />
+                          More details
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </section>
           )}
 
           {(menuItems.length > 0 || truck.menu_text || truck.menu_photo_url) && (

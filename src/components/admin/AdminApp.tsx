@@ -2,12 +2,13 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { Truck } from "@/lib/types";
+import type { Truck, EventWithTrucks } from "@/lib/types";
 import { logoutAction } from "@/app/admin/actions";
 import { cn, Card, Badge } from "./ui";
 import TrucksTab from "./TrucksTab";
 import ClaimsTab from "./ClaimsTab";
 import UsersTab from "./UsersTab";
+import AdminEventsTab from "./AdminEventsTab";
 
 export interface AdminTruck extends Truck {
   scans: number;
@@ -28,22 +29,25 @@ export interface AdminUser {
   display_name: string | null;
 }
 
-type Tab = "overview" | "trucks" | "claims" | "users";
+type Tab = "overview" | "trucks" | "claims" | "events" | "users";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "overview", label: "Overview" },
   { key: "trucks", label: "Trucks" },
   { key: "claims", label: "Claims" },
+  { key: "events", label: "Events" },
   { key: "users", label: "Users" },
 ];
 
 export default function AdminApp({
   trucks,
   users,
+  events,
   hasServiceRole,
 }: {
   trucks: AdminTruck[];
   users: AdminUser[] | null;
+  events: EventWithTrucks[];
   hasServiceRole: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("overview");
@@ -176,6 +180,12 @@ export default function AdminApp({
 
         {tab === "trucks" && <TrucksTab trucks={trucks} />}
         {tab === "claims" && <ClaimsTab trucks={trucks} hasServiceRole={hasServiceRole} />}
+        {tab === "events" && (
+          <AdminEventsTab
+            events={events}
+            trucks={trucks.map((t) => ({ id: t.id, name: t.name }))}
+          />
+        )}
         {tab === "users" && <UsersTab users={users} hasServiceRole={hasServiceRole} />}
       </div>
     </div>

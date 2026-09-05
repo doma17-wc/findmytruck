@@ -1,5 +1,7 @@
 import type { TruckWithSchedules } from "@/lib/data";
+import type { EventWithTrucks } from "@/lib/types";
 import { computeTruckStatus, readBoost } from "@/lib/geo";
+import { isEventOngoing } from "@/lib/events";
 import { regionFallbackStatus } from "@/lib/unclaimed";
 import type { DiscoverEntry, TruckRating } from "./types";
 
@@ -11,7 +13,8 @@ export function isAvailableNow(entry: DiscoverEntry): boolean {
 export function buildEntries(
   trucks: TruckWithSchedules[],
   ratings: Record<string, TruckRating>,
-  now: Date
+  now: Date,
+  eventsByTruck: Record<string, EventWithTrucks[]> = {}
 ): DiscoverEntry[] {
   return trucks
     .map(({ truck, schedules }): DiscoverEntry | null => {
@@ -30,12 +33,17 @@ export function buildEntries(
       const active = status.schedule;
       if (!active) return null;
 
+      const events = eventsByTruck[truck.id] ?? [];
+      const activeEvent = events.find((e) => isEventOngoing(e, now)) ?? null;
+
       return {
         truck,
         status,
         schedules,
         coord: [active.location_lng, active.location_lat],
         rating: ratings[truck.id] ?? null,
+        events,
+        activeEvent,
       };
     })
     .filter((e): e is DiscoverEntry => e !== null);

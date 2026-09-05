@@ -4,6 +4,7 @@ import TikTokIcon from "@/components/icons/TikTokIcon";
 
 const LINKS = [
   { href: "/about", label: "About" },
+  { href: "/events", label: "Events" },
   { href: "/privacy", label: "Privacy Policy" },
   { href: "/terms", label: "Terms" },
   { href: "/contact", label: "Contact" },

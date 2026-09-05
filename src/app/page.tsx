@@ -1,6 +1,7 @@
 import DiscoverClient from "@/components/discover/DiscoverClient";
 import type { TruckRating } from "@/components/discover/types";
 import { getAllTrucksWithSchedules } from "@/lib/data";
+import { getUpcomingEventsByTruck } from "@/lib/events";
 import { supabase } from "@/lib/supabase";
 import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
 
@@ -30,6 +31,7 @@ export default async function HomePage() {
     getRatings(),
     getCurrentUserProfile(),
   ]);
+  const eventsByTruck = await getUpcomingEventsByTruck(trucks.map((t) => t.truck.id));
 
   let favoritedIds: string[] = [];
   if (auth) {
@@ -45,6 +47,7 @@ export default async function HomePage() {
     <DiscoverClient
       initialTrucks={trucks}
       ratings={ratings}
+      eventsByTruck={eventsByTruck}
       auth={auth ? { email: auth.user.email ?? "", profile: auth.profile } : null}
       favoritedIds={favoritedIds}
     />

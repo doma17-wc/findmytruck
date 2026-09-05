@@ -7,6 +7,7 @@ import {
   Zap,
   UtensilsCrossed,
   CalendarDays,
+  PartyPopper,
   Star,
   BarChart3,
   Settings as SettingsIcon,
@@ -14,12 +15,13 @@ import {
   X,
   ExternalLink,
 } from "lucide-react";
-import type { Truck, TruckSchedule, TruckPhoto, Review } from "@/lib/types";
+import type { Truck, TruckSchedule, TruckPhoto, Review, EventWithTrucks } from "@/lib/types";
 import { ToastProvider, Beacon, cn } from "./ui";
 import OverviewPanel from "./panels/OverviewPanel";
 import BoostPanel from "./panels/BoostPanel";
 import MenuPanel from "./panels/MenuPanel";
 import SchedulePanel from "./panels/SchedulePanel";
+import EventsPanel from "./panels/EventsPanel";
 import ReviewsPanel from "./panels/ReviewsPanel";
 import InsightsPanel from "./panels/InsightsPanel";
 import SettingsPanel from "./panels/SettingsPanel";
@@ -45,6 +47,7 @@ interface Props {
   schedules: TruckSchedule[];
   photos: TruckPhoto[];
   reviews: Review[];
+  events: EventWithTrucks[];
   boosted: boolean;
   boostExpiresAt: string | null;
   boostStartedAt: string | null;
@@ -57,6 +60,7 @@ type PanelKey =
   | "boost"
   | "menu"
   | "schedule"
+  | "events"
   | "reviews"
   | "insights"
   | "settings";
@@ -66,6 +70,7 @@ const NAV: { key: PanelKey; label: string; icon: typeof LayoutGrid }[] = [
   { key: "boost", label: "Boost", icon: Zap },
   { key: "menu", label: "Menu", icon: UtensilsCrossed },
   { key: "schedule", label: "Tour schedule", icon: CalendarDays },
+  { key: "events", label: "Events", icon: PartyPopper },
   { key: "reviews", label: "Reviews", icon: Star },
   { key: "insights", label: "Insights", icon: BarChart3 },
   { key: "settings", label: "Settings", icon: SettingsIcon },
@@ -76,6 +81,7 @@ const HEADINGS: Record<PanelKey, { title: string; subtitle: string }> = {
   boost: { title: "Boost", subtitle: "Jump to the top of the map when you're serving" },
   menu: { title: "Menu", subtitle: "Prices update on your public profile instantly" },
   schedule: { title: "Tour schedule", subtitle: "Your regular weekly stops" },
+  events: { title: "Events", subtitle: "One-off appearances — festivals, markets, private events" },
   reviews: { title: "Reviews", subtitle: "What customers are saying" },
   insights: { title: "Insights", subtitle: "Trends across your pitches and week" },
   settings: { title: "Settings", subtitle: "Profile, payment, photos" },
@@ -212,6 +218,7 @@ export default function DashboardApp(props: Props) {
               {active === "boost" && <BoostPanel {...props} />}
               {active === "menu" && <MenuPanel truck={truck} />}
               {active === "schedule" && <SchedulePanel schedules={props.schedules} />}
+              {active === "events" && <EventsPanel events={props.events} />}
               {active === "reviews" && <ReviewsPanel reviews={props.reviews} />}
               {active === "insights" && <InsightsPanel stats={props.stats} />}
               {active === "settings" && (

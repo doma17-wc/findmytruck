@@ -11,6 +11,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import type { TruckWithSchedules } from "@/lib/data";
+import type { EventWithTrucks } from "@/lib/types";
 import { distanceKm } from "@/lib/geo";
 import { CITY_LIST, DEFAULT_MAP_CENTER, CITIES } from "@/lib/cities";
 import DiscoverHeader from "./DiscoverHeader";
@@ -42,6 +43,7 @@ const TIER_PRIORITY: Record<TruckTier, number> = {
 interface DiscoverClientProps {
   initialTrucks: TruckWithSchedules[];
   ratings: Record<string, TruckRating>;
+  eventsByTruck?: Record<string, EventWithTrucks[]>;
   auth: { email: string; profile: AppProfile | null } | null;
   favoritedIds: string[];
 }
@@ -49,6 +51,7 @@ interface DiscoverClientProps {
 export default function DiscoverClient({
   initialTrucks,
   ratings,
+  eventsByTruck = {},
   auth,
   favoritedIds,
 }: DiscoverClientProps) {
@@ -90,8 +93,8 @@ export default function DiscoverClient({
   }, []);
 
   const allEntries = useMemo(
-    () => buildEntries(initialTrucks, ratings, now),
-    [initialTrucks, ratings, now]
+    () => buildEntries(initialTrucks, ratings, now, eventsByTruck),
+    [initialTrucks, ratings, now, eventsByTruck]
   );
 
   const cityCenter: [number, number] | null = citySlug

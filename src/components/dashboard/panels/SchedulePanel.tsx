@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { Loader2 } from "lucide-react";
-import type { TruckSchedule } from "@/lib/types";
+import type { ScheduleFrequency, TruckSchedule } from "@/lib/types";
 import { DAY_LABELS } from "@/lib/types";
 import { getMondayFirstDay } from "@/lib/geo";
 import { publishTourAction, type TourDayInput } from "@/app/dashboard/actions";
@@ -17,6 +17,9 @@ interface DayState {
   open: boolean;
   lat: number | null;
   lng: number | null;
+  frequency: ScheduleFrequency;
+  frequencyParity: "even" | "odd";
+  frequencyWeeks: number[];
 }
 
 function buildDays(schedules: TruckSchedule[]): DayState[] {
@@ -29,8 +32,86 @@ function buildDays(schedules: TruckSchedule[]): DayState[] {
       open: Boolean(row),
       lat: row?.location_lat ?? null,
       lng: row?.location_lng ?? null,
+      frequency: row?.frequency ?? "weekly",
+      frequencyParity: row?.frequency_parity ?? "odd",
+      frequencyWeeks: row?.frequency_weeks ?? [],
     };
   });
+}
+
+const FREQUENCY_OPTIONS: { key: ScheduleFrequency; label: string }[] = [
+  { key: "weekly", label: "Every week" },
+  { key: "alternate", label: "Alternating" },
+  { key: "monthly_weeks", label: "Monthly" },
+];
+
+function FrequencyPicker({ day, patch }: { day: DayState; patch: (p: Partial<DayState>) => void }) {
+  if (!day.open) return null;
+  return (
+    <div className="col-span-full flex flex-wrap items-center gap-2 pl-0 sm:col-start-2 sm:col-end-5">
+      <div className="inline-flex overflow-hidden rounded-lg border border-line text-[11px] font-bold">
+        {FREQUENCY_OPTIONS.map((opt) => (
+          <button
+            key={opt.key}
+            type="button"
+            onClick={() => patch({ frequency: opt.key })}
+            className={cn(
+              "px-2.5 py-1.5 transition",
+              day.frequency === opt.key ? "bg-ink text-white" : "bg-card text-ink-soft hover:bg-paper-deep"
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
+      {day.frequency === "alternate" && (
+        <div className="inline-flex overflow-hidden rounded-lg border border-line text-[11px] font-bold">
+          {(["odd", "even"] as const).map((p) => (
+            <button
+              key={p}
+              type="button"
+              onClick={() => patch({ frequencyParity: p })}
+              className={cn(
+                "px-2.5 py-1.5 capitalize transition",
+                day.frequencyParity === p ? "bg-accent text-white" : "bg-card text-ink-soft hover:bg-paper-deep"
+              )}
+              title={p === "odd" ? "Weeks 1, 3, 5… of the year" : "Weeks 2, 4, 6… of the year"}
+            >
+              {p}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {day.frequency === "monthly_weeks" && (
+        <div className="inline-flex overflow-hidden rounded-lg border border-line text-[11px] font-bold">
+          {[1, 2, 3, 4].map((n) => {
+            const active = day.frequencyWeeks.includes(n);
+            return (
+              <button
+                key={n}
+                type="button"
+                onClick={() =>
+                  patch({
+                    frequencyWeeks: active
+                      ? day.frequencyWeeks.filter((w) => w !== n)
+                      : [...day.frequencyWeeks, n].sort(),
+                  })
+                }
+                className={cn(
+                  "px-2.5 py-1.5 transition",
+                  active ? "bg-accent text-white" : "bg-card text-ink-soft hover:bg-paper-deep"
+                )}
+              >
+                {n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : "4th"}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function SchedulePanel({ schedules }: { schedules: TruckSchedule[] }) {
@@ -53,6 +134,9 @@ export default function SchedulePanel({ schedules }: { schedules: TruckSchedule[
       // straight through; a null pair tells the server to geocode the text.
       lat: d.lat,
       lng: d.lng,
+      frequency: d.frequency,
+      frequencyParity: d.frequency === "alternate" ? d.frequencyParity : null,
+      frequencyWeeks: d.frequency === "monthly_weeks" ? d.frequencyWeeks : null,
     }));
     startTransition(async () => {
       const res = await publishTourAction(payload);
@@ -133,6 +217,8 @@ export default function SchedulePanel({ schedules }: { schedules: TruckSchedule[
                   >
                     {d.open ? "Open" : "Closed"}
                   </button>
+
+                  <FrequencyPicker day={d} patch={(p) => patch(idx, p)} />
                 </div>
               );
             })}
