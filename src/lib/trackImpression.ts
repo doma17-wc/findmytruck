@@ -31,7 +31,11 @@ function flush() {
   if (pending.size === 0) return;
   const truckIds = [...pending];
   pending = new Set();
-  void createClient().rpc("increment_truck_impression", { p_truck_ids: truckIds });
+  void createClient()
+    .rpc("increment_truck_impression", { p_truck_ids: truckIds })
+    .then(({ error }) => {
+      if (error) console.error("[trackImpression] flush failed:", error.message);
+    });
 }
 
 function ensureLifecycle() {

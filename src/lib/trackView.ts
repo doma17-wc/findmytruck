@@ -20,5 +20,10 @@ export function recordTruckView(truckId: string, isOwnerView: boolean): void {
     // record the view, just without per-session de-dup.
   }
 
-  void createClient().from("truck_page_views").insert({ truck_id: truckId });
+  void createClient()
+    .from("truck_page_views")
+    .insert({ truck_id: truckId })
+    .then(({ error }) => {
+      if (error) console.error("[trackView] insert failed:", error.message);
+    });
 }
