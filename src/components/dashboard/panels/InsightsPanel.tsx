@@ -9,6 +9,18 @@ export default function InsightsPanel({ stats }: { stats: DashboardStats }) {
     <div className="space-y-6">
       <Card>
         <CardBody>
+          <h2 className="font-display text-base font-bold text-ink">Impressions this week</h2>
+          <p className="text-sm text-muted">
+            How many times your card was shown across the map, list, and browse grid
+          </p>
+          <div className="mt-4">
+            <BarChart data={stats.weeklyImpressions} accent="#9333EA" />
+          </div>
+        </CardBody>
+      </Card>
+
+      <Card>
+        <CardBody>
           <h2 className="font-display text-base font-bold text-ink">Best days</h2>
           <p className="text-sm text-muted">Average profile views by weekday (last 90 days)</p>
           <div className="mt-4">

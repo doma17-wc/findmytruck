@@ -6,19 +6,42 @@ import AdminApp, { type AdminTruck, type AdminUser } from "@/components/admin/Ad
 
 export const dynamic = "force-dynamic";
 
+const DAY = 24 * 60 * 60 * 1000;
+
 function claimStatusOf(t: Truck): "unclaimed" | "pending" | "claimed" {
   return (t.claim_status as "unclaimed" | "pending" | "claimed" | null) ??
     (t.is_claimed ? "claimed" : "unclaimed");
 }
 
+function dateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+}
+
 export default async function AdminDashboardPage() {
   const service = getServiceSupabase();
   const now = new Date();
+  const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY);
 
-  const [{ data: truckRows }, { data: redirects }, reviewsRes] = await Promise.all([
+  const [
+    { data: truckRows },
+    { data: redirects },
+    reviewsRes,
+    { data: impressionRows },
+    { data: viewRows },
+  ] = await Promise.all([
     supabase.from("trucks").select("*").order("created_at", { ascending: false }),
     supabase.from("qr_redirects").select("truck_id, scan_count"),
     supabase.from("reviews").select("id, truck_id"),
+    supabase
+      .from("truck_impressions")
+      .select("truck_id, count")
+      .gte("date", dateStr(thirtyDaysAgo)),
+    supabase
+      .from("truck_page_views")
+      .select("truck_id")
+      .gte("viewed_at", thirtyDaysAgo.toISOString()),
   ]);
 
   const scansByTruck = new Map<string, number>();
@@ -34,11 +57,23 @@ export default async function AdminDashboardPage() {
     });
   }
 
+  const impressionsByTruck = new Map<string, number>();
+  ((impressionRows ?? []) as { truck_id: string; count: number }[]).forEach((r) => {
+    impressionsByTruck.set(r.truck_id, (impressionsByTruck.get(r.truck_id) ?? 0) + r.count);
+  });
+
+  const viewsByTruck = new Map<string, number>();
+  ((viewRows ?? []) as { truck_id: string }[]).forEach((r) => {
+    viewsByTruck.set(r.truck_id, (viewsByTruck.get(r.truck_id) ?? 0) + 1);
+  });
+
   const trucks: AdminTruck[] = ((truckRows ?? []) as Truck[]).map((t) => ({
     ...t,
     claim_status: claimStatusOf(t),
     scans: scansByTruck.get(t.id) ?? 0,
     reviewCount: reviewsByTruck.get(t.id) ?? 0,
+    impressions30: impressionsByTruck.get(t.id) ?? 0,
+    views30: viewsByTruck.get(t.id) ?? 0,
     boostedNow: isBoostActive(readBoost(t), now),
   }));
 

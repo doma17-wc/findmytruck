@@ -9,6 +9,7 @@ import FavoriteButton from "@/components/FavoriteButton";
 import TruckPlaceholder from "@/components/site/TruckPlaceholder";
 import type { DiscoverEntry } from "./types";
 import { RatingBadge, StatusPill } from "./Bits";
+import { useImpressionRef } from "./useImpressionRef";
 
 interface TruckCardProps {
   entry: DiscoverEntry;
@@ -16,13 +17,14 @@ interface TruckCardProps {
   favorited: boolean;
   selected: boolean;
   distanceKm: number | null;
+  isOwnerView: boolean;
   onSelect: () => void;
   onHover: (hovering: boolean) => void;
 }
 
 const TruckCard = forwardRef<HTMLDivElement, TruckCardProps>(function TruckCard(
-  { entry, signedIn, favorited, selected, distanceKm, onSelect, onHover },
-  ref
+  { entry, signedIn, favorited, selected, distanceKm, isOwnerView, onSelect, onHover },
+  forwardedRef
 ) {
   const { truck, status, rating } = entry;
   const image = truck.cover_photo_url ?? truck.logo_url;
@@ -30,9 +32,16 @@ const TruckCard = forwardRef<HTMLDivElement, TruckCardProps>(function TruckCard(
   const boosted = status.tier === "boosted";
   const cityLine = status.schedule?.location_name ?? truck.source_region ?? "Location to be confirmed";
 
+  const impressionRef = useImpressionRef(truck.id, isOwnerView);
+  const setRefs = (el: HTMLDivElement | null) => {
+    impressionRef(el);
+    if (typeof forwardedRef === "function") forwardedRef(el);
+    else if (forwardedRef) forwardedRef.current = el;
+  };
+
   return (
     <div
-      ref={ref}
+      ref={setRefs}
       onMouseEnter={() => onHover(true)}
       onMouseLeave={() => onHover(false)}
       className={`group relative scroll-mt-4 overflow-hidden rounded-2xl border bg-card text-left transition duration-200 ${

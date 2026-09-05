@@ -10,6 +10,15 @@ export const dynamic = "force-dynamic";
 
 const DAY = 24 * 60 * 60 * 1000;
 
+/** Local-date string (YYYY-MM-DD), matching the `date` column truck_impressions
+ * groups by -- comparable directly since Postgres returns dates as this same
+ * "YYYY-MM-DD" string shape. */
+function dateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
+}
+
 export default async function DashboardPage() {
   const auth = await getCurrentUserProfile();
   if (!auth) redirect("/login?next=/dashboard");
@@ -23,6 +32,8 @@ export default async function DashboardPage() {
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const ninetyDaysAgo = new Date(now.getTime() - 90 * DAY).toISOString();
 
+  const fourteenDaysAgo = dateStr(new Date(startOfToday.getTime() - 13 * DAY));
+
   const [
     { data: truck },
     { data: schedules },
@@ -30,6 +41,7 @@ export default async function DashboardPage() {
     { data: reviews },
     { data: viewRows },
     { data: favRows },
+    { data: impressionRows },
   ] = await Promise.all([
     supabase.from("trucks").select("*").eq("id", truckId).maybeSingle(),
     supabase.from("truck_schedules").select("*").eq("truck_id", truckId).order("day_of_week"),
@@ -45,12 +57,20 @@ export default async function DashboardPage() {
       .eq("truck_id", truckId)
       .gte("viewed_at", ninetyDaysAgo),
     supabase.from("user_favorites").select("created_at").eq("truck_id", truckId),
+    supabase
+      .from("truck_impressions")
+      .select("date, count")
+      .eq("truck_id", truckId)
+      .gte("date", fourteenDaysAgo),
   ]);
 
   if (!truck) redirect("/register-truck");
 
   const views = (viewRows ?? []) as { viewed_at: string }[];
   const favs = (favRows ?? []) as { created_at: string }[];
+  const impressionsByDate = new Map(
+    ((impressionRows ?? []) as { date: string; count: number }[]).map((r) => [r.date, r.count])
+  );
   const menuItems = normalizeMenuItems((truck as Truck).menu_items);
 
   // ---- Views: today, last 7 days, and a 7-day daily series ----
@@ -69,6 +89,26 @@ export default async function DashboardPage() {
     });
   }
   const views7 = weeklyViews.reduce((sum, d) => sum + d.value, 0);
+
+  // ---- Impressions: today, this week, last week (for the trend), and a
+  // 7-day daily series -- summed from the daily counter, not one row per hit.
+  const impressionsToday = impressionsByDate.get(dateStr(startOfToday)) ?? 0;
+
+  const weeklyImpressions: { label: string; value: number }[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const day = new Date(startOfToday.getTime() - i * DAY);
+    weeklyImpressions.push({
+      label: day.toLocaleDateString("en", { weekday: "short" }),
+      value: impressionsByDate.get(dateStr(day)) ?? 0,
+    });
+  }
+  const impressions7 = weeklyImpressions.reduce((sum, d) => sum + d.value, 0);
+
+  let impressionsPrev7 = 0;
+  for (let i = 13; i >= 7; i--) {
+    const day = new Date(startOfToday.getTime() - i * DAY);
+    impressionsPrev7 += impressionsByDate.get(dateStr(day)) ?? 0;
+  }
 
   // ---- Average views by weekday (Mon-first), over the 90-day window ----
   const weekdayTotals = Array(7).fill(0);
@@ -113,11 +153,15 @@ export default async function DashboardPage() {
   const stats: DashboardStats = {
     viewsToday,
     views7,
+    impressionsToday,
+    impressions7,
+    impressionsPrev7,
     followers: favs.length,
     menuItemCount: menuItems.length,
     reviewCount: reviewList.length,
     avgRating,
     weeklyViews,
+    weeklyImpressions,
     byWeekday,
     followerGrowth,
   };

@@ -12,6 +12,8 @@ import UsersTab from "./UsersTab";
 export interface AdminTruck extends Truck {
   scans: number;
   reviewCount: number;
+  impressions30: number;
+  views30: number;
   boostedNow: boolean;
 }
 
@@ -56,6 +58,8 @@ export default function AdminApp({
       boostedNow: 0,
       inactive: 0,
       scans: 0,
+      impressions30: 0,
+      views30: 0,
       customers: 0,
       owners: 0,
     };
@@ -68,6 +72,8 @@ export default function AdminApp({
       if (t.boostedNow) s.boostedNow++;
       if (!t.is_active) s.inactive++;
       s.scans += t.scans;
+      s.impressions30 += t.impressions30;
+      s.views30 += t.views30;
     }
     if (users) {
       s.customers = users.filter((u) => u.role !== "truck_owner").length;
@@ -117,6 +123,15 @@ export default function AdminApp({
               <Stat label="Claimed" value={stats.claimed} tone="blue" />
               <Stat label="Inactive" value={stats.inactive} />
               <Stat label="Total QR scans" value={stats.scans} />
+              <Stat
+                label="Impressions (30d)"
+                value={stats.impressions30}
+                sub={
+                  stats.impressions30 > 0
+                    ? `${Math.round((stats.views30 / stats.impressions30) * 1000) / 10}% conversion`
+                    : undefined
+                }
+              />
               <Stat
                 label="Users"
                 value={users ? users.length : "—"}

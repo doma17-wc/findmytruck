@@ -8,12 +8,14 @@ import FavoriteButton from "@/components/FavoriteButton";
 import TruckPlaceholder from "@/components/site/TruckPlaceholder";
 import type { DiscoverEntry } from "./types";
 import { RatingBadge, StatusPill } from "./Bits";
+import { useImpressionRef } from "./useImpressionRef";
 
 interface BrowseCardProps {
   entry: DiscoverEntry;
   signedIn: boolean;
   favorited: boolean;
   distanceKm: number | null;
+  isOwnerView: boolean;
   onSelect: () => void;
 }
 
@@ -23,6 +25,7 @@ export default function BrowseCard({
   signedIn,
   favorited,
   distanceKm,
+  isOwnerView,
   onSelect,
 }: BrowseCardProps) {
   const { truck, status, rating } = entry;
@@ -32,8 +35,11 @@ export default function BrowseCard({
   const cityLine =
     status.schedule?.location_name ?? truck.source_region ?? "Location to be confirmed";
 
+  const impressionRef = useImpressionRef(truck.id, isOwnerView);
+
   return (
     <div
+      ref={impressionRef}
       className="group relative flex flex-col overflow-hidden rounded-2xl border border-line bg-card shadow-paper transition duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-card-hover"
     >
       <button

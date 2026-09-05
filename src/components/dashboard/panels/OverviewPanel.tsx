@@ -1,6 +1,6 @@
 "use client";
 
-import { Eye, Users, UtensilsCrossed, Zap, ArrowRight } from "lucide-react";
+import { Eye, Users, UtensilsCrossed, Zap, ArrowRight, TrendingUp, TrendingDown } from "lucide-react";
 import type { Truck } from "@/lib/types";
 import { Card, CardBody, BarChart } from "../ui";
 import BoostHero from "../BoostHero";
@@ -37,6 +37,73 @@ function Kpi({
   );
 }
 
+function ReachCard({ stats }: { stats: DashboardStats }) {
+  const conversion =
+    stats.impressions7 > 0 ? Math.round((stats.views7 / stats.impressions7) * 1000) / 10 : 0;
+  const trend =
+    stats.impressionsPrev7 > 0
+      ? Math.round(((stats.impressions7 - stats.impressionsPrev7) / stats.impressionsPrev7) * 100)
+      : null;
+
+  return (
+    <Card>
+      <CardBody>
+        <div className="flex items-center justify-between gap-2">
+          <h2 className="font-display text-base font-bold text-ink">Reach &amp; conversion</h2>
+          {trend !== null && (
+            <span
+              className={`inline-flex items-center gap-1 text-xs font-bold ${
+                trend >= 0 ? "text-green-600" : "text-muted"
+              }`}
+            >
+              {trend >= 0 ? (
+                <TrendingUp className="h-3.5 w-3.5" />
+              ) : (
+                <TrendingDown className="h-3.5 w-3.5" />
+              )}
+              {trend >= 0 ? "+" : ""}
+              {trend}% vs last week
+            </span>
+          )}
+        </div>
+
+        <div className="mt-4 grid grid-cols-3 gap-3">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-muted">
+              Impressions today
+            </p>
+            <p className="mt-1 font-display text-2xl font-extrabold text-ink">
+              {stats.impressionsToday}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-muted">
+              Impressions (7d)
+            </p>
+            <p className="mt-1 font-display text-2xl font-extrabold text-ink">
+              {stats.impressions7}
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-muted">
+              Conversion
+            </p>
+            <p className="mt-1 font-display text-2xl font-extrabold text-accent">
+              {conversion}%
+            </p>
+          </div>
+        </div>
+
+        <p className="mt-3 text-xs text-muted">
+          {stats.impressions7 === 0
+            ? "Once your truck starts showing up in searches, you'll see how many people notice it here."
+            : `${conversion}% of people who saw your truck opened your profile. A higher rate means your photo & name attract clicks.`}
+        </p>
+      </CardBody>
+    </Card>
+  );
+}
+
 export default function OverviewPanel({
   truck,
   boosted,
@@ -47,7 +114,8 @@ export default function OverviewPanel({
 }: Props) {
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <Kpi icon={Eye} label="Impressions today" value={stats.impressionsToday} />
         <Kpi icon={Eye} label="Views today" value={stats.viewsToday} />
         <Kpi icon={Users} label="Followers" value={stats.followers} />
         <Kpi icon={UtensilsCrossed} label="Menu items" value={stats.menuItemCount} />
@@ -68,6 +136,8 @@ export default function OverviewPanel({
           <ArrowRight className="h-4 w-4" />
         </button>
       </BoostHero>
+
+      <ReachCard stats={stats} />
 
       <Card>
         <CardBody>

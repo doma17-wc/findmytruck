@@ -20,6 +20,8 @@ type StatusFilter =
   | "boosted"
   | "inactive";
 
+type PerfSort = "none" | "impressions" | "views" | "conversion";
+
 const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "All" },
   { key: "unclaimed", label: "Unclaimed" },
@@ -30,11 +32,16 @@ const STATUS_FILTERS: { key: StatusFilter; label: string }[] = [
   { key: "inactive", label: "Inactive" },
 ];
 
+function conversionOf(t: AdminTruck): number {
+  return t.impressions30 > 0 ? (t.views30 / t.impressions30) * 100 : -1;
+}
+
 export default function TrucksTab({ trucks }: { trucks: AdminTruck[] }) {
   const [status, setStatus] = useState<StatusFilter>("all");
   const [region, setRegion] = useState("");
   const [cuisine, setCuisine] = useState("");
   const [q, setQ] = useState("");
+  const [perfSort, setPerfSort] = useState<PerfSort>("none");
 
   const regions = useMemo(
     () => Array.from(new Set(trucks.map((t) => t.source_region).filter(Boolean))).sort() as string[],
@@ -66,6 +73,17 @@ export default function TrucksTab({ trucks }: { trucks: AdminTruck[] }) {
       return true;
     });
   }, [trucks, status, region, cuisine, q]);
+
+  const sorted = useMemo(() => {
+    if (perfSort === "none") return visible;
+    const arr = [...visible];
+    arr.sort((a, b) => {
+      if (perfSort === "impressions") return b.impressions30 - a.impressions30;
+      if (perfSort === "views") return b.views30 - a.views30;
+      return conversionOf(b) - conversionOf(a);
+    });
+    return arr;
+  }, [visible, perfSort]);
 
   return (
     <div className="space-y-4">
@@ -105,6 +123,19 @@ export default function TrucksTab({ trucks }: { trucks: AdminTruck[] }) {
         ))}
       </div>
 
+      <div className="flex flex-wrap gap-2">
+        <select
+          value={perfSort}
+          onChange={(e) => setPerfSort(e.target.value as PerfSort)}
+          className="rounded-lg border border-line bg-card px-3 py-1.5 text-sm font-semibold text-ink-soft outline-none focus:border-accent"
+        >
+          <option value="none">Sort: default</option>
+          <option value="impressions">Sort: most impressions (30d)</option>
+          <option value="views">Sort: most views (30d)</option>
+          <option value="conversion">Sort: best conversion (30d)</option>
+        </select>
+      </div>
+
       {(regions.length > 0 || cuisines.length > 0) && (
         <div className="flex flex-wrap gap-2">
           {regions.length > 0 && (
@@ -139,7 +170,7 @@ export default function TrucksTab({ trucks }: { trucks: AdminTruck[] }) {
       )}
 
       <div className="space-y-3">
-        {visible.map((t) => (
+        {sorted.map((t) => (
           <TruckRow key={t.id} t={t} />
         ))}
         {visible.length === 0 && (
@@ -177,6 +208,12 @@ function TruckRow({ t }: { t: AdminTruck }) {
           </p>
           <p className="mt-0.5 text-xs text-muted">
             {t.scans} scans · {t.reviewCount} reviews · <span className="font-mono">/{t.slug}</span>
+          </p>
+          <p className="mt-0.5 text-xs text-muted">
+            {t.impressions30} impressions · {t.views30} views
+            {t.impressions30 > 0 &&
+              ` · ${Math.round((t.views30 / t.impressions30) * 1000) / 10}% conversion`}{" "}
+            (30d)
           </p>
         </div>
       </div>

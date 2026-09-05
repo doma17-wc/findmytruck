@@ -338,6 +338,7 @@ export default function DiscoverClient({
                     favorited={favoritedSet.has(entry.truck.id)}
                     selected={selectedId === entry.truck.id}
                     distanceKm={userLocation ? dist : null}
+                    isOwnerView={ownTruckId === entry.truck.id}
                     onSelect={() => setSelectedId(entry.truck.id)}
                     onHover={(h) => setHoveredId(h ? entry.truck.id : null)}
                     ref={(el) => {
@@ -401,6 +402,7 @@ export default function DiscoverClient({
         entries={allEntries}
         signedIn={signedIn}
         favoritedSet={favoritedSet}
+        ownTruckId={ownTruckId}
         userLocation={userLocation}
         geoStatus={geoStatus}
         onRequestLocation={requestLocation}

@@ -27,11 +27,15 @@ import SettingsPanel from "./panels/SettingsPanel";
 export interface DashboardStats {
   viewsToday: number;
   views7: number;
+  impressionsToday: number;
+  impressions7: number;
+  impressionsPrev7: number;
   followers: number;
   menuItemCount: number;
   reviewCount: number;
   avgRating: number;
   weeklyViews: { label: string; value: number }[];
+  weeklyImpressions: { label: string; value: number }[];
   byWeekday: { label: string; value: number }[];
   followerGrowth: { label: string; value: number }[];
 }
