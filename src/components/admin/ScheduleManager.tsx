@@ -5,6 +5,7 @@ import type { TruckSchedule } from "@/lib/types";
 import { DAY_LABELS } from "@/lib/types";
 import { saveScheduleAction, deleteScheduleAction } from "@/app/admin/actions";
 import LocationSearch from "./LocationSearch";
+import TimePickerField from "@/components/shared/TimePickerField";
 
 const inputClass =
   "w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-[15px] focus:border-accent focus:outline-none";
@@ -126,20 +127,20 @@ export default function ScheduleManager({ truckId, schedules }: ScheduleManagerP
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-neutral-500">Start time</span>
-              <input
-                type="time"
+              <TimePickerField
                 value={draft.start_time}
-                onChange={(e) => setDraft((d) => ({ ...d, start_time: e.target.value }))}
-                className={inputClass}
+                onChange={(start_time) => setDraft((d) => ({ ...d, start_time }))}
+                ariaLabel="Start time"
+                triggerClassName={`${inputClass} text-left`}
               />
             </label>
             <label className="block">
               <span className="mb-1 block text-xs font-medium text-neutral-500">End time</span>
-              <input
-                type="time"
+              <TimePickerField
                 value={draft.end_time}
-                onChange={(e) => setDraft((d) => ({ ...d, end_time: e.target.value }))}
-                className={inputClass}
+                onChange={(end_time) => setDraft((d) => ({ ...d, end_time }))}
+                ariaLabel="End time"
+                triggerClassName={`${inputClass} text-left`}
               />
             </label>
           </div>

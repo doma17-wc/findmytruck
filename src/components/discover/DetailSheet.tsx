@@ -5,6 +5,8 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   BadgeCheck,
+  ChevronLeft,
+  ChevronRight,
   ExternalLink,
   Globe,
   MapPin,
@@ -21,6 +23,7 @@ import { DAY_LABELS_SHORT, type TruckPhoto } from "@/lib/types";
 import { formatTimeRange, getMondayFirstDay } from "@/lib/geo";
 import { isUnclaimed } from "@/lib/unclaimed";
 import { createClient } from "@/lib/supabase/client";
+import { recordTruckView } from "@/lib/trackView";
 import type { DiscoverEntry } from "./types";
 import { RatingBadge } from "./Bits";
 import { dietaryPills } from "./helpers";
@@ -30,6 +33,7 @@ interface DetailSheetProps {
   now: Date;
   signedIn: boolean;
   favorited: boolean;
+  isOwnerView: boolean;
   onClose: () => void;
 }
 
@@ -44,6 +48,7 @@ export default function DetailSheet({
   now,
   signedIn,
   favorited,
+  isOwnerView,
   onClose,
 }: DetailSheetProps) {
   const { truck, status, schedules, rating } = entry;
@@ -75,6 +80,10 @@ export default function DetailSheet({
     };
   }, [onClose]);
 
+  useEffect(() => {
+    recordTruckView(truck.id, isOwnerView);
+  }, [truck.id, isOwnerView]);
+
   // Lazy-load the gallery only for the truck currently open in the sheet —
   // fetching photos for every pin/list row up front would be wasteful.
   const [photos, setPhotos] = useState<TruckPhoto[]>([]);
@@ -105,6 +114,62 @@ export default function DetailSheet({
     setActiveIdx(Math.round(el.scrollLeft / el.clientWidth));
   };
 
+  const scrollToIndex = (i: number) => {
+    const el = scrollRef.current;
+    if (!el || galleryImages.length === 0) return;
+    const clamped = (i + galleryImages.length) % galleryImages.length;
+    el.scrollTo({ left: clamped * el.clientWidth, behavior: "smooth" });
+  };
+
+  // Desktop mouse-drag-to-scroll for the hero carousel. Touch pointers are
+  // skipped entirely so native swipe/snap behavior is untouched.
+  const dragRef = useRef<{ startX: number; startScroll: number } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "touch" || galleryImages.length < 2) return;
+    const el = scrollRef.current;
+    if (!el) return;
+    dragRef.current = { startX: e.clientX, startScroll: el.scrollLeft };
+    setIsDragging(true);
+    el.setPointerCapture(e.pointerId);
+  };
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const state = dragRef.current;
+    const el = scrollRef.current;
+    if (!state || !el) return;
+    el.scrollLeft = state.startScroll - (e.clientX - state.startX);
+  };
+  const endDrag = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!dragRef.current) return;
+    dragRef.current = null;
+    setIsDragging(false);
+    const el = scrollRef.current;
+    if (el && el.clientWidth > 0) {
+      // Snap to the nearest photo instead of leaving it mid-scroll.
+      scrollToIndex(Math.round(el.scrollLeft / el.clientWidth));
+    }
+    try {
+      el?.releasePointerCapture(e.pointerId);
+    } catch {
+      // Pointer capture may already be released.
+    }
+  };
+
+  // Let a vertical mouse-wheel / trackpad gesture drive the horizontal
+  // carousel too (desktop has no touch swipe to fall back on).
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || galleryImages.length < 2) return;
+    const onWheel = (e: WheelEvent) => {
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+      el.scrollLeft += e.deltaY;
+      e.preventDefault();
+    };
+    el.addEventListener("wheel", onWheel, { passive: false });
+    return () => el.removeEventListener("wheel", onWheel);
+  }, [galleryImages.length]);
+
   return (
     <div className="fixed inset-0 z-[60]">
       <div
@@ -119,12 +184,21 @@ export default function DetailSheet({
         className="sheet-in absolute inset-y-0 right-0 flex w-full max-w-[460px] flex-col bg-paper shadow-2xl"
       >
         {/* Hero photo carousel */}
-        <div className="relative h-64 flex-shrink-0 bg-paper-deep sm:h-72">
+        <div className="group relative h-64 flex-shrink-0 bg-paper-deep sm:h-72">
           {galleryImages.length > 0 ? (
             <div
               ref={scrollRef}
               onScroll={onHeroScroll}
-              className="no-scrollbar flex h-full w-full snap-x snap-mandatory overflow-x-auto scroll-smooth"
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={endDrag}
+              onPointerCancel={endDrag}
+              onDragStart={(e) => e.preventDefault()}
+              className={`no-scrollbar flex h-full w-full select-none snap-x snap-mandatory overflow-x-auto ${
+                isDragging
+                  ? "cursor-grabbing"
+                  : `scroll-smooth ${galleryImages.length > 1 ? "cursor-grab" : ""}`
+              }`}
             >
               {galleryImages.map((src, i) => (
                 <div key={src + i} className="relative h-full w-full flex-shrink-0 snap-center">
@@ -133,7 +207,8 @@ export default function DetailSheet({
                     alt={`${truck.name} photo ${i + 1}`}
                     fill
                     priority={i === 0}
-                    className="object-cover"
+                    draggable={false}
+                    className="pointer-events-none object-cover"
                     sizes="460px"
                   />
                 </div>
@@ -159,16 +234,43 @@ export default function DetailSheet({
           </span>
 
           {galleryImages.length > 1 && (
-            <div className="pointer-events-none absolute inset-x-0 bottom-3 flex items-center justify-center gap-1.5">
-              {galleryImages.map((_, i) => (
-                <span
-                  key={i}
-                  className={`h-1.5 rounded-full shadow-sm transition-all ${
-                    i === activeIdx ? "w-4 bg-white" : "w-1.5 bg-white/60"
-                  }`}
-                />
-              ))}
-            </div>
+            <>
+              <button
+                type="button"
+                onClick={() => scrollToIndex(activeIdx - 1)}
+                aria-label="Previous photo"
+                className="absolute left-2 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-ink opacity-0 shadow-md backdrop-blur-sm transition hover:bg-white active:scale-95 group-hover:opacity-100 sm:flex"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => scrollToIndex(activeIdx + 1)}
+                aria-label="Next photo"
+                className="absolute right-2 top-1/2 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/90 text-ink opacity-0 shadow-md backdrop-blur-sm transition hover:bg-white active:scale-95 group-hover:opacity-100 sm:flex"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+
+              <div className="absolute inset-x-0 bottom-3 flex items-center justify-center gap-1.5">
+                {galleryImages.map((_, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    onClick={() => scrollToIndex(i)}
+                    aria-label={`Go to photo ${i + 1}`}
+                    aria-current={i === activeIdx}
+                    className="flex h-4 w-4 items-center justify-center"
+                  >
+                    <span
+                      className={`h-1.5 rounded-full shadow-sm transition-all ${
+                        i === activeIdx ? "w-4 bg-white" : "w-1.5 bg-white/60 hover:bg-white/80"
+                      }`}
+                    />
+                  </button>
+                ))}
+              </div>
+            </>
           )}
         </div>
 

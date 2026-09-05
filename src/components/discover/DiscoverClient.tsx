@@ -54,6 +54,7 @@ export default function DiscoverClient({
 }: DiscoverClientProps) {
   const signedIn = Boolean(auth);
   const favoritedSet = useMemo(() => new Set(favoritedIds), [favoritedIds]);
+  const ownTruckId = auth?.profile?.role === "truck_owner" ? auth.profile.truck_id : null;
 
   const [now, setNow] = useState(() => new Date());
   const {
@@ -412,6 +413,7 @@ export default function DiscoverClient({
           now={now}
           signedIn={signedIn}
           favorited={favoritedSet.has(selectedEntry.truck.id)}
+          isOwnerView={ownTruckId === selectedEntry.truck.id}
           onClose={() => setSelectedId(null)}
         />
       )}

@@ -13,6 +13,7 @@ import TruckPlaceholder from "@/components/site/TruckPlaceholder";
 import { computeTruckStatus, formatTimeRange, getMondayFirstDay, readBoost } from "@/lib/geo";
 import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
 import FavoriteButton from "@/components/FavoriteButton";
+import ViewTracker from "@/components/shared/ViewTracker";
 
 export const revalidate = 300;
 
@@ -63,7 +64,6 @@ export default async function TruckProfilePage({ params }: PageProps) {
   ]);
 
   const supabase = createClient();
-  void supabase.from("truck_page_views").insert({ truck_id: truck.id });
 
   let isFavorited = false;
   if (auth) {
@@ -76,6 +76,7 @@ export default async function TruckProfilePage({ params }: PageProps) {
     isFavorited = Boolean(data);
   }
 
+  const isOwnerView = auth?.profile?.truck_id === truck.id;
   const menuItems = normalizeMenuItems(truck.menu_items);
   const unclaimed = isUnclaimed(truck);
   const websiteUrl = truck.website ?? truck.source_website ?? null;
@@ -123,6 +124,7 @@ export default async function TruckProfilePage({ params }: PageProps) {
 
   return (
     <div className="min-h-dvh bg-white pb-16">
+      <ViewTracker truckId={truck.id} isOwnerView={isOwnerView} />
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}

@@ -8,6 +8,7 @@ import { getMondayFirstDay } from "@/lib/geo";
 import { publishTourAction, type TourDayInput } from "@/app/dashboard/actions";
 import { Card, CardBody, useToast, cn } from "../ui";
 import LocationAutocomplete from "../LocationAutocomplete";
+import TimePickerField from "@/components/shared/TimePickerField";
 
 interface DayState {
   location: string;
@@ -105,22 +106,20 @@ export default function SchedulePanel({ schedules }: { schedules: TruckSchedule[
                     className="w-full rounded-lg border border-line bg-card px-3 py-2 text-sm text-ink outline-none focus:border-accent"
                   />
 
-                  <input
-                    type="time"
+                  <TimePickerField
                     value={d.startTime}
-                    onChange={(e) => patch(idx, { startTime: e.target.value })}
+                    onChange={(startTime) => patch(idx, { startTime })}
                     disabled={!d.open}
-                    aria-label={`${label} start time`}
-                    className="w-full rounded-lg border border-line bg-card px-2 py-2 font-mono text-sm outline-none focus:border-accent disabled:opacity-40"
+                    ariaLabel={`${label} start time`}
+                    triggerClassName="w-full rounded-lg border border-line bg-card px-2 py-2 text-left font-mono text-sm outline-none focus:border-accent disabled:opacity-40"
                   />
 
-                  <input
-                    type="time"
+                  <TimePickerField
                     value={d.endTime}
-                    onChange={(e) => patch(idx, { endTime: e.target.value })}
+                    onChange={(endTime) => patch(idx, { endTime })}
                     disabled={!d.open}
-                    aria-label={`${label} end time`}
-                    className="w-full rounded-lg border border-line bg-card px-2 py-2 font-mono text-sm outline-none focus:border-accent disabled:opacity-40"
+                    ariaLabel={`${label} end time`}
+                    triggerClassName="w-full rounded-lg border border-line bg-card px-2 py-2 text-left font-mono text-sm outline-none focus:border-accent disabled:opacity-40"
                   />
 
                   <button
