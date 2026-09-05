@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, BadgeCheck, Globe, Link2, MapPin, Music2, Navigation, PartyPopper } from "lucide-react";
+import { ArrowLeft, BadgeCheck, Globe, MapPin, Music2, Navigation, PartyPopper } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { getTruckBySlug, getTruckPhotos, getTruckSchedule } from "@/lib/data";
 import { getEventsForTruck } from "@/lib/events";
@@ -15,6 +15,7 @@ import { computeTruckStatus, formatTimeRange, getMondayFirstDay, readBoost } fro
 import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
 import FavoriteButton from "@/components/FavoriteButton";
 import ViewTracker from "@/components/shared/ViewTracker";
+import EventTypeBadge from "@/components/shared/EventTypeBadge";
 
 export const revalidate = 300;
 
@@ -353,39 +354,56 @@ export default async function TruckProfilePage({ params }: PageProps) {
           {events.length > 0 && (
             <section className="mt-9">
               <h2 className="text-lg font-bold text-neutral-900">Upcoming events</h2>
-              <div className="mt-3 space-y-3">
+              <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {events.map((e) => (
-                  <div
+                  <Link
                     key={e.id}
-                    className="flex items-start gap-3 rounded-2xl border border-brand-100 bg-brand-50/40 p-4 shadow-card"
+                    href={`/events/${e.id}`}
+                    className="group flex flex-col overflow-hidden rounded-2xl border border-brand-100 bg-white shadow-card transition hover:shadow-card-hover"
                   >
-                    <PartyPopper className="mt-0.5 h-5 w-5 flex-shrink-0 text-brand" />
-                    <div className="min-w-0">
-                      <p className="font-semibold text-neutral-900">{e.name}</p>
-                      <p className="mt-0.5 text-xs font-bold uppercase tracking-wide text-brand">
+                    <div className="relative aspect-[16/10] w-full bg-brand-50">
+                      {e.image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={e.image_url}
+                          alt={e.name}
+                          className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center">
+                          <PartyPopper className="h-8 w-8 text-brand" />
+                        </div>
+                      )}
+                      <div className="absolute left-2.5 top-2.5">
+                        <EventTypeBadge type={e.event_type} className="bg-white/95 backdrop-blur-sm" />
+                      </div>
+                    </div>
+                    <div className="flex flex-1 flex-col p-4">
+                      <p className="text-xs font-bold uppercase tracking-wide text-brand">
                         {formatEventDate(e.start_date, e.end_date)}
                         {e.start_time && ` · ${e.start_time.slice(0, 5)}–${(e.end_time ?? "").slice(0, 5)}`}
                       </p>
-                      <p className="mt-1.5 flex items-start gap-1.5 text-sm text-neutral-600">
+                      <p className="mt-1 font-semibold text-neutral-900">{e.name}</p>
+                      <p className="mt-1 flex items-start gap-1.5 text-sm text-neutral-600">
                         <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-neutral-400" />
-                        {e.location_name}
+                        <span className="line-clamp-1">{e.location_name}</span>
                       </p>
-                      {e.description && (
-                        <p className="mt-1.5 text-sm text-neutral-600">{e.description}</p>
-                      )}
-                      {e.link && (
-                        <a
-                          href={e.link.startsWith("http") ? e.link : `https://${e.link}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-brand hover:underline"
-                        >
-                          <Link2 className="h-4 w-4" />
-                          More details
-                        </a>
-                      )}
+                      <div className="mt-2 flex flex-1 items-end justify-between gap-2">
+                        {e.trucks.length > 1 ? (
+                          <span className="text-xs font-medium text-neutral-500">
+                            {e.trucks.length} trucks attending
+                          </span>
+                        ) : (
+                          <span />
+                        )}
+                        {e.interestedCount > 0 && (
+                          <span className="text-xs font-medium text-neutral-500">
+                            {e.interestedCount} interested
+                          </span>
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </section>

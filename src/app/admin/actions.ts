@@ -349,6 +349,7 @@ export interface EventFormResult {
 function revalidateEvents(truckId?: string | null) {
   revalidatePublic();
   revalidatePath("/events");
+  revalidatePath("/events/[id]", "page");
   if (truckId) revalidatePath(`/admin/trucks/${truckId}`);
 }
 
@@ -364,6 +365,13 @@ export async function saveEventAction(
 
   const createdByTruckId = String(formData.get("created_by_truck_id") ?? "") || null;
 
+  const eventTypeRaw = String(formData.get("event_type") ?? "other");
+  const eventType = ["festival", "market", "catering", "street_food", "opening", "other"].includes(
+    eventTypeRaw
+  )
+    ? eventTypeRaw
+    : "other";
+
   const payload = {
     name,
     description: String(formData.get("description") ?? "") || null,
@@ -375,6 +383,8 @@ export async function saveEventAction(
     location_lat: Number(formData.get("location_lat")),
     location_lng: Number(formData.get("location_lng")),
     link: String(formData.get("link") ?? "") || null,
+    image_url: String(formData.get("image_url") ?? "") || null,
+    event_type: eventType,
     created_by_truck_id: createdByTruckId,
   };
 
@@ -397,7 +407,7 @@ export async function saveEventAction(
   if (truckIds.length > 0) {
     await supabase
       .from("event_trucks")
-      .insert(truckIds.map((truck_id) => ({ event_id: data.id, truck_id })));
+      .insert(truckIds.map((truck_id) => ({ event_id: data.id, truck_id, status: "confirmed" })));
   }
 
   revalidateEvents(createdByTruckId);
@@ -411,7 +421,7 @@ export async function setEventTrucksAction(eventId: string, truckIds: string[]) 
   if (truckIds.length > 0) {
     await supabase
       .from("event_trucks")
-      .insert(truckIds.map((truck_id) => ({ event_id: eventId, truck_id })));
+      .insert(truckIds.map((truck_id) => ({ event_id: eventId, truck_id, status: "confirmed" })));
   }
   revalidateEvents();
 }

@@ -3,9 +3,11 @@
 import { useMemo, useState } from "react";
 import type { EventWithTrucks } from "@/lib/types";
 import { saveEventAction, setEventTrucksAction, deleteEventAction } from "@/app/admin/actions";
+import { EVENT_TYPE_OPTIONS, EVENT_TYPE_META, type EventType } from "@/lib/types";
 import { Card } from "./ui";
 import LocationSearch from "./LocationSearch";
 import TimePickerField from "@/components/shared/TimePickerField";
+import EventImageDropzone from "@/components/shared/EventImageDropzone";
 
 const inputClass =
   "w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-[15px] focus:border-accent focus:outline-none";
@@ -26,6 +28,8 @@ interface DraftEvent {
   location_lat: number | null;
   location_lng: number | null;
   link: string;
+  image_url: string | null;
+  event_type: EventType;
   truckIds: string[];
 }
 
@@ -40,6 +44,8 @@ const emptyDraft: DraftEvent = {
   location_lat: null,
   location_lng: null,
   link: "",
+  image_url: null,
+  event_type: "festival",
   truckIds: [],
 };
 
@@ -96,6 +102,8 @@ export default function AdminEventsTab({
       location_lat: e.location_lat,
       location_lng: e.location_lng,
       link: e.link ?? "",
+      image_url: e.image_url ?? null,
+      event_type: e.event_type ?? "festival",
       truckIds: e.trucks.map((t) => t.id),
     });
     setError(null);
@@ -133,6 +141,8 @@ export default function AdminEventsTab({
     fd.set("location_lat", String(draft.location_lat));
     fd.set("location_lng", String(draft.location_lng));
     fd.set("link", draft.link);
+    fd.set("image_url", draft.image_url ?? "");
+    fd.set("event_type", draft.event_type);
     if (!editingId) fd.set("truck_ids", draft.truckIds.join(","));
 
     const res = await saveEventAction(editingId, fd);
@@ -205,12 +215,29 @@ export default function AdminEventsTab({
             {editingId ? "Edit event" : "New event (e.g. a general festival with many trucks)"}
           </h3>
           <div className="mt-3 space-y-3">
+            <EventImageDropzone
+              value={draft.image_url}
+              onChange={(image_url) => setDraft((d) => ({ ...d, image_url }))}
+            />
             <input
               value={draft.name}
               onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
               placeholder="Event name"
               className={inputClass}
             />
+            <select
+              value={draft.event_type}
+              onChange={(e) =>
+                setDraft((d) => ({ ...d, event_type: e.target.value as EventType }))
+              }
+              className={inputClass}
+            >
+              {EVENT_TYPE_OPTIONS.map((t) => (
+                <option key={t} value={t}>
+                  {EVENT_TYPE_META[t].emoji} {EVENT_TYPE_META[t].label}
+                </option>
+              ))}
+            </select>
             <textarea
               value={draft.description}
               onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}

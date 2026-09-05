@@ -10,6 +10,16 @@ import TimePickerField from "@/components/shared/TimePickerField";
 const inputClass =
   "w-full rounded-xl border border-neutral-200 px-3 py-2.5 text-[15px] focus:border-accent focus:outline-none";
 
+// Light segmented toggle — soft track, raised white thumb with an orange label
+// for the active option (replaces the old heavy black active state).
+const segTrack = "inline-flex flex-wrap gap-0.5 rounded-xl bg-neutral-100 p-0.5";
+const segBtn = (active: boolean, extra = "") =>
+  `rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition ${extra} ${
+    active
+      ? "bg-white text-brand-700 shadow-sm ring-1 ring-black/5"
+      : "text-neutral-500 hover:text-neutral-800"
+  }`;
+
 interface ScheduleManagerProps {
   truckId: string;
   schedules: TruckSchedule[];
@@ -160,15 +170,13 @@ export default function ScheduleManager({ truckId, schedules }: ScheduleManagerP
           <div>
             <span className="mb-1 block text-xs font-medium text-neutral-500">Frequency</span>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex overflow-hidden rounded-lg border border-neutral-200 text-[11px] font-bold">
+              <div className={segTrack}>
                 {FREQUENCY_OPTIONS.map((opt) => (
                   <button
                     key={opt.key}
                     type="button"
                     onClick={() => setDraft((d) => ({ ...d, frequency: opt.key }))}
-                    className={`px-2.5 py-1.5 transition ${
-                      draft.frequency === opt.key ? "bg-neutral-900 text-white" : "bg-white text-neutral-500"
-                    }`}
+                    className={segBtn(draft.frequency === opt.key)}
                   >
                     {opt.label}
                   </button>
@@ -176,15 +184,13 @@ export default function ScheduleManager({ truckId, schedules }: ScheduleManagerP
               </div>
 
               {draft.frequency === "alternate" && (
-                <div className="inline-flex overflow-hidden rounded-lg border border-neutral-200 text-[11px] font-bold">
+                <div className={segTrack}>
                   {(["odd", "even"] as const).map((p) => (
                     <button
                       key={p}
                       type="button"
                       onClick={() => setDraft((d) => ({ ...d, frequency_parity: p }))}
-                      className={`px-2.5 py-1.5 capitalize transition ${
-                        draft.frequency_parity === p ? "bg-accent text-white" : "bg-white text-neutral-500"
-                      }`}
+                      className={segBtn(draft.frequency_parity === p, "capitalize")}
                     >
                       {p}
                     </button>
@@ -193,7 +199,7 @@ export default function ScheduleManager({ truckId, schedules }: ScheduleManagerP
               )}
 
               {draft.frequency === "monthly_weeks" && (
-                <div className="inline-flex overflow-hidden rounded-lg border border-neutral-200 text-[11px] font-bold">
+                <div className={segTrack}>
                   {[1, 2, 3, 4].map((n) => {
                     const active = draft.frequency_weeks.includes(n);
                     return (
@@ -208,9 +214,7 @@ export default function ScheduleManager({ truckId, schedules }: ScheduleManagerP
                               : [...d.frequency_weeks, n].sort(),
                           }))
                         }
-                        className={`px-2.5 py-1.5 transition ${
-                          active ? "bg-accent text-white" : "bg-white text-neutral-500"
-                        }`}
+                        className={segBtn(active)}
                       >
                         {n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : "4th"}
                       </button>

@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { CalendarDays, Link2, MapPin } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 import { getAllUpcomingEvents } from "@/lib/events";
+import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
+import { EVENT_TYPE_META, EVENT_TYPE_OPTIONS, normalizeEventType } from "@/lib/types";
+import EventCard from "@/components/events/EventCard";
 
-export const revalidate = 300;
+export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "Events — Food Trucks in Switzerland",
@@ -12,77 +14,74 @@ export const metadata: Metadata = {
   alternates: { canonical: "https://findmytruck.ch/events" },
 };
 
-function formatEventDate(start: string, end: string): string {
-  const opts: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", month: "short" };
-  const s = new Date(`${start}T00:00:00`).toLocaleDateString("en", opts);
-  if (start === end) return s;
-  const e = new Date(`${end}T00:00:00`).toLocaleDateString("en", opts);
-  return `${s} – ${e}`;
-}
-
 export default async function EventsPage() {
   const events = await getAllUpcomingEvents();
 
+  const auth = await getCurrentUserProfile();
+  let interestedIds = new Set<string>();
+  if (auth) {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("event_rsvps")
+      .select("event_id")
+      .eq("user_id", auth.user.id);
+    interestedIds = new Set(((data ?? []) as { event_id: string }[]).map((r) => r.event_id));
+  }
+
+  // Which categories are actually represented, for a light filter legend.
+  const presentTypes = EVENT_TYPE_OPTIONS.filter((t) =>
+    events.some((e) => normalizeEventType(e.event_type) === t)
+  );
+
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8 pb-16">
-      <h1 className="text-2xl font-extrabold tracking-tight text-neutral-900 sm:text-3xl">Events</h1>
-      <p className="mt-2 text-[15px] text-neutral-600">
-        Festivals, markets, and private events happening around Switzerland — see which food
-        trucks will be there.
-      </p>
+    <div className="mx-auto max-w-5xl px-4 py-8 pb-16">
+      <div className="flex items-center gap-3">
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-brand text-white">
+          <CalendarDays className="h-5 w-5" />
+        </span>
+        <div>
+          <h1 className="text-2xl font-extrabold tracking-tight text-neutral-900 sm:text-3xl">
+            What&apos;s happening
+          </h1>
+          <p className="text-[15px] text-neutral-600">
+            Festivals, markets &amp; food-truck gatherings around Switzerland
+          </p>
+        </div>
+      </div>
+
+      {presentTypes.length > 1 && (
+        <div className="mt-5 flex flex-wrap gap-2">
+          {presentTypes.map((t) => {
+            const meta = EVENT_TYPE_META[t];
+            return (
+              <span
+                key={t}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold ${meta.badge}`}
+              >
+                <span>{meta.emoji}</span>
+                {meta.label}
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       {events.length === 0 ? (
-        <p className="mt-10 text-center text-sm text-neutral-500">
-          No upcoming events right now. Check back soon!
-        </p>
+        <div className="mt-12 rounded-2xl border border-dashed border-neutral-200 py-16 text-center">
+          <p className="text-4xl">🎪</p>
+          <p className="mt-3 text-sm text-neutral-500">
+            No upcoming events right now. Check back soon!
+          </p>
+        </div>
       ) : (
-        <div className="mt-6 space-y-4">
+        <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
           {events.map((e) => (
-            <div key={e.id} className="rounded-2xl border border-neutral-100 p-5 shadow-card">
-              <div className="flex items-start gap-3">
-                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-brand-50 text-brand">
-                  <CalendarDays className="h-5 w-5" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold uppercase tracking-wide text-brand">
-                    {formatEventDate(e.start_date, e.end_date)}
-                    {e.start_time && ` · ${e.start_time.slice(0, 5)}–${(e.end_time ?? "").slice(0, 5)}`}
-                  </p>
-                  <h2 className="mt-1 text-lg font-bold text-neutral-900">{e.name}</h2>
-                  <p className="mt-1.5 flex items-start gap-1.5 text-sm text-neutral-600">
-                    <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-neutral-400" />
-                    {e.location_name}
-                  </p>
-                  {e.description && <p className="mt-2 text-sm text-neutral-600">{e.description}</p>}
-
-                  {e.trucks.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {e.trucks.map((t) => (
-                        <Link
-                          key={t.id}
-                          href={`/trucks/${t.slug}`}
-                          className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-700 transition hover:bg-brand-50 hover:text-brand"
-                        >
-                          {t.name}
-                        </Link>
-                      ))}
-                    </div>
-                  )}
-
-                  {e.link && (
-                    <a
-                      href={e.link.startsWith("http") ? e.link : `https://${e.link}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="mt-3 inline-flex items-center gap-1.5 text-sm font-bold text-brand hover:underline"
-                    >
-                      <Link2 className="h-4 w-4" />
-                      More details
-                    </a>
-                  )}
-                </div>
-              </div>
-            </div>
+            <EventCard
+              key={e.id}
+              event={e}
+              signedIn={Boolean(auth)}
+              interested={interestedIds.has(e.id)}
+            />
           ))}
         </div>
       )}

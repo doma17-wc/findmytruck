@@ -195,3 +195,63 @@ export async function sendContactMessage(input: ContactInput): Promise<{ ok: boo
     replyTo: input.email,
   });
 }
+
+/** ---------- Feature 3: truck invited to collaborate on an event ---------- */
+
+interface EventInvitationInput {
+  to: string;
+  invitedTruckName: string;
+  hostTruckName: string;
+  eventName: string;
+  eventDate: string; // human-readable range
+  eventLocation: string;
+}
+
+export async function notifyEventInvitation(input: EventInvitationInput): Promise<void> {
+  const site = process.env.NEXT_PUBLIC_SITE_URL ?? "https://findmytruck.ch";
+  const dashboardUrl = `${site}/dashboard`;
+
+  const rows = [
+    row("Event", esc(input.eventName)),
+    row("Invited by", esc(input.hostTruckName)),
+    row("When", esc(input.eventDate)),
+    row("Where", esc(input.eventLocation)),
+  ].join("");
+
+  const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;">
+    <h2 style="font-size:18px;color:#191817;margin:0 0 4px;">You're invited to an event 🎉</h2>
+    <p style="font-size:14px;color:#4A4642;margin:0 0 16px;">
+      <strong>${esc(input.hostTruckName)}</strong> invited <strong>${esc(
+        input.invitedTruckName
+      )}</strong> to join their event on FindMyTruck.
+    </p>
+    <table style="border-collapse:collapse;width:100%;">${rows}</table>
+    <p style="margin:20px 0 0;">
+      <a href="${esc(dashboardUrl)}" style="display:inline-block;background:#FF6A00;color:#fff;
+        font-size:14px;font-weight:700;text-decoration:none;padding:10px 18px;border-radius:10px;">
+        Review the invitation
+      </a>
+    </p>
+    <p style="font-size:12px;color:#8C867E;margin:12px 0 0;">
+      Open your dashboard → Events → Invitations to accept or decline.
+    </p>
+  </div>`;
+
+  const text = [
+    "You're invited to an event on FindMyTruck",
+    `${input.hostTruckName} invited ${input.invitedTruckName} to join their event.`,
+    "",
+    `Event: ${input.eventName}`,
+    `When: ${input.eventDate}`,
+    `Where: ${input.eventLocation}`,
+    "",
+    `Accept or decline from your dashboard: ${dashboardUrl}`,
+  ].join("\n");
+
+  await sendEmail({
+    to: input.to,
+    subject: `🎉 ${input.hostTruckName} invited you to "${input.eventName}"`,
+    html,
+    text,
+  });
+}

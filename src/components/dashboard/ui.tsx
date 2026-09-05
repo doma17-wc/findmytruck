@@ -169,3 +169,57 @@ export function BarChart({
 
 export const dashInput =
   "w-full rounded-xl border border-line bg-card px-3.5 py-2.5 text-[15px] text-ink outline-none transition focus:border-accent focus:ring-2 focus:ring-accent/20 placeholder:text-muted";
+
+/* -------------------- Segmented control (light) -------------------- *
+ * A soft pill/segmented toggle: a low-contrast paper track with a raised
+ * white thumb + brand-orange label for the active option. Replaces the old
+ * heavy black (`bg-ink text-white`) active state. Used for the schedule
+ * frequency picker and any similar dashboard toggle.                   */
+
+export const segmentTrackClass =
+  "inline-flex flex-wrap gap-0.5 rounded-xl bg-paper-deep p-0.5";
+
+export function segmentButtonClass(active: boolean, className?: string): string {
+  return cn(
+    "rounded-lg px-2.5 py-1.5 text-[11px] font-bold transition select-none",
+    active
+      ? "bg-card text-brand-700 shadow-sm ring-1 ring-black/5"
+      : "text-muted hover:text-ink-soft",
+    className
+  );
+}
+
+export function SegmentedControl<T extends string>({
+  options,
+  value,
+  onChange,
+  size = "sm",
+  ariaLabel,
+}: {
+  options: { value: T; label: string; title?: string }[];
+  value: T;
+  onChange: (value: T) => void;
+  size?: "sm" | "md";
+  ariaLabel?: string;
+}) {
+  return (
+    <div className={segmentTrackClass} role="tablist" aria-label={ariaLabel}>
+      {options.map((opt) => (
+        <button
+          key={opt.value}
+          type="button"
+          role="tab"
+          aria-selected={value === opt.value}
+          title={opt.title}
+          onClick={() => onChange(opt.value)}
+          className={segmentButtonClass(
+            value === opt.value,
+            size === "md" ? "px-3.5 py-2 text-xs" : undefined
+          )}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+  );
+}

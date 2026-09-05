@@ -97,17 +97,121 @@ export interface FmtEvent {
   link: string | null;
   created_by_truck_id: string | null;
   created_at: string;
+  /** Poster / flyer / venue photo (migration 0012). May be absent on rows read
+   *  before that migration. */
+  image_url?: string | null;
+  /** Category (migration 0012). Falls back to "other" on pre-migration rows. */
+  event_type?: EventType | null;
 }
+
+/** Event category (migration 0012). */
+export type EventType =
+  | "festival"
+  | "market"
+  | "catering"
+  | "street_food"
+  | "opening"
+  | "other";
+
+export interface EventTypeMeta {
+  key: EventType;
+  label: string;
+  /** Tailwind classes for the badge chip (bg + text + border). */
+  badge: string;
+  /** Tailwind text-color class for the standalone icon. */
+  icon: string;
+  emoji: string;
+}
+
+export const EVENT_TYPE_META: Record<EventType, EventTypeMeta> = {
+  festival: {
+    key: "festival",
+    label: "Festival",
+    badge: "bg-brand-50 text-brand-700 border-brand-200",
+    icon: "text-brand-600",
+    emoji: "🎪",
+  },
+  market: {
+    key: "market",
+    label: "Market",
+    badge: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    icon: "text-emerald-600",
+    emoji: "🧺",
+  },
+  catering: {
+    key: "catering",
+    label: "Private / Catering",
+    badge: "bg-violet-50 text-violet-700 border-violet-200",
+    icon: "text-violet-600",
+    emoji: "🍽️",
+  },
+  street_food: {
+    key: "street_food",
+    label: "Street food gathering",
+    badge: "bg-amber-50 text-amber-700 border-amber-200",
+    icon: "text-amber-600",
+    emoji: "🌮",
+  },
+  opening: {
+    key: "opening",
+    label: "Opening",
+    badge: "bg-sky-50 text-sky-700 border-sky-200",
+    icon: "text-sky-600",
+    emoji: "🎉",
+  },
+  other: {
+    key: "other",
+    label: "Other",
+    badge: "bg-neutral-100 text-neutral-600 border-neutral-200",
+    icon: "text-neutral-500",
+    emoji: "📍",
+  },
+};
+
+export const EVENT_TYPE_OPTIONS: EventType[] = [
+  "festival",
+  "market",
+  "catering",
+  "street_food",
+  "opening",
+  "other",
+];
+
+export function normalizeEventType(raw: unknown): EventType {
+  return EVENT_TYPE_OPTIONS.includes(raw as EventType) ? (raw as EventType) : "other";
+}
+
+export type EventTruckStatus = "invited" | "confirmed" | "declined";
 
 export interface EventTruckRef {
   id: string;
   slug: string;
   name: string;
+  logo_url: string | null;
 }
 
-/** An event with the trucks attending it attached (many-to-many via `event_trucks`). */
+/** An event with the CONFIRMED trucks attending it attached (many-to-many via
+ *  `event_trucks`). `interestedCount` comes from `event_rsvp_counts`. */
 export interface EventWithTrucks extends FmtEvent {
   trucks: EventTruckRef[];
+  interestedCount: number;
+}
+
+export interface EventCollaborator {
+  id: string;
+  name: string;
+  logo_url: string | null;
+  status: EventTruckStatus;
+}
+
+/** One event as seen from a single truck's dashboard, with that truck's own
+ *  link status attached so the panel can split hosting / attending / invited. */
+export interface DashboardEvent extends EventWithTrucks {
+  myStatus: EventTruckStatus;
+  isHost: boolean;
+  /** Every non-host truck linked to the event, any status. Only populated for
+   *  events this truck HOSTS (so the host can manage its invite list). */
+  collaborators: EventCollaborator[];
 }
 
 export interface TruckPhoto {

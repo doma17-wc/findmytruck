@@ -9,7 +9,6 @@ import {
   ChevronRight,
   ExternalLink,
   Globe,
-  Link2,
   MapPin,
   Music2,
   Navigation,
@@ -17,6 +16,7 @@ import {
   X,
 } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
+import EventTypeBadge from "@/components/shared/EventTypeBadge";
 import TruckPlaceholder from "@/components/site/TruckPlaceholder";
 import TruckMenu from "@/components/site/TruckMenu";
 import FavoriteButton from "@/components/FavoriteButton";
@@ -453,11 +453,26 @@ export default function DetailSheet({
               </h3>
               <div className="mt-2 space-y-2.5">
                 {events.map((e) => (
-                  <div key={e.id} className="rounded-2xl border border-accent/25 bg-accent/5 p-3.5">
-                    <div className="flex items-start gap-2">
-                      <PartyPopper className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-dark" />
+                  <Link
+                    key={e.id}
+                    href={`/events/${e.id}`}
+                    className="block overflow-hidden rounded-2xl border border-accent/25 bg-accent/5 transition hover:bg-accent/10"
+                  >
+                    {e.image_url && (
+                      <div className="relative aspect-[16/9] w-full bg-accent/10">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={e.image_url} alt={e.name} className="h-full w-full object-cover" />
+                      </div>
+                    )}
+                    <div className="flex items-start gap-2 p-3.5">
+                      {!e.image_url && (
+                        <PartyPopper className="mt-0.5 h-4 w-4 flex-shrink-0 text-accent-dark" />
+                      )}
                       <div className="min-w-0">
-                        <p className="text-[13px] font-bold text-ink">{e.name}</p>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <EventTypeBadge type={e.event_type} />
+                          <p className="text-[13px] font-bold text-ink">{e.name}</p>
+                        </div>
                         <p className="mt-0.5 text-[12px] font-bold uppercase tracking-wide text-accent-dark">
                           {formatEventDate(e.start_date, e.end_date)}
                           {e.start_time && ` · ${e.start_time.slice(0, 5)}–${(e.end_time ?? "").slice(0, 5)}`}
@@ -467,22 +482,16 @@ export default function DetailSheet({
                           {e.location_name}
                         </p>
                         {e.description && (
-                          <p className="mt-1 text-[13px] text-ink-soft">{e.description}</p>
+                          <p className="mt-1 line-clamp-2 text-[13px] text-ink-soft">{e.description}</p>
                         )}
-                        {e.link && (
-                          <a
-                            href={e.link.startsWith("http") ? e.link : `https://${e.link}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-1.5 inline-flex items-center gap-1 text-[12px] font-bold text-accent-dark hover:underline"
-                          >
-                            <Link2 className="h-3.5 w-3.5" />
-                            More details
-                          </a>
+                        {e.interestedCount > 0 && (
+                          <p className="mt-1 text-[12px] font-medium text-muted">
+                            {e.interestedCount} interested
+                          </p>
                         )}
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 ))}
               </div>
             </section>

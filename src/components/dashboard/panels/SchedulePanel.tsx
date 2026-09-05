@@ -6,7 +6,7 @@ import type { ScheduleFrequency, TruckSchedule } from "@/lib/types";
 import { DAY_LABELS } from "@/lib/types";
 import { getMondayFirstDay } from "@/lib/geo";
 import { publishTourAction, type TourDayInput } from "@/app/dashboard/actions";
-import { Card, CardBody, useToast, cn } from "../ui";
+import { Card, CardBody, useToast, cn, segmentTrackClass, segmentButtonClass } from "../ui";
 import LocationAutocomplete from "../LocationAutocomplete";
 import TimePickerField from "@/components/shared/TimePickerField";
 
@@ -49,16 +49,13 @@ function FrequencyPicker({ day, patch }: { day: DayState; patch: (p: Partial<Day
   if (!day.open) return null;
   return (
     <div className="col-span-full flex flex-wrap items-center gap-2 pl-0 sm:col-start-2 sm:col-end-5">
-      <div className="inline-flex overflow-hidden rounded-lg border border-line text-[11px] font-bold">
+      <div className={segmentTrackClass}>
         {FREQUENCY_OPTIONS.map((opt) => (
           <button
             key={opt.key}
             type="button"
             onClick={() => patch({ frequency: opt.key })}
-            className={cn(
-              "px-2.5 py-1.5 transition",
-              day.frequency === opt.key ? "bg-ink text-white" : "bg-card text-ink-soft hover:bg-paper-deep"
-            )}
+            className={segmentButtonClass(day.frequency === opt.key)}
           >
             {opt.label}
           </button>
@@ -66,16 +63,13 @@ function FrequencyPicker({ day, patch }: { day: DayState; patch: (p: Partial<Day
       </div>
 
       {day.frequency === "alternate" && (
-        <div className="inline-flex overflow-hidden rounded-lg border border-line text-[11px] font-bold">
+        <div className={segmentTrackClass}>
           {(["odd", "even"] as const).map((p) => (
             <button
               key={p}
               type="button"
               onClick={() => patch({ frequencyParity: p })}
-              className={cn(
-                "px-2.5 py-1.5 capitalize transition",
-                day.frequencyParity === p ? "bg-accent text-white" : "bg-card text-ink-soft hover:bg-paper-deep"
-              )}
+              className={segmentButtonClass(day.frequencyParity === p, "capitalize")}
               title={p === "odd" ? "Weeks 1, 3, 5… of the year" : "Weeks 2, 4, 6… of the year"}
             >
               {p}
@@ -85,7 +79,7 @@ function FrequencyPicker({ day, patch }: { day: DayState; patch: (p: Partial<Day
       )}
 
       {day.frequency === "monthly_weeks" && (
-        <div className="inline-flex overflow-hidden rounded-lg border border-line text-[11px] font-bold">
+        <div className={segmentTrackClass}>
           {[1, 2, 3, 4].map((n) => {
             const active = day.frequencyWeeks.includes(n);
             return (
@@ -99,10 +93,7 @@ function FrequencyPicker({ day, patch }: { day: DayState; patch: (p: Partial<Day
                       : [...day.frequencyWeeks, n].sort(),
                   })
                 }
-                className={cn(
-                  "px-2.5 py-1.5 transition",
-                  active ? "bg-accent text-white" : "bg-card text-ink-soft hover:bg-paper-deep"
-                )}
+                className={segmentButtonClass(active)}
               >
                 {n === 1 ? "1st" : n === 2 ? "2nd" : n === 3 ? "3rd" : "4th"}
               </button>

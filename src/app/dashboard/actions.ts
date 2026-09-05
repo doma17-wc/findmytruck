@@ -7,7 +7,8 @@ import { geocode } from "@/lib/geocode";
 import { getMondayFirstDay } from "@/lib/geo";
 import { DEFAULT_MAP_CENTER } from "@/lib/cities";
 import { PHOTO_BUCKET, storagePathFromPublicUrl } from "@/lib/storage";
-import type { ScheduleFrequency } from "@/lib/types";
+import { notifyEventInvitation } from "@/lib/email";
+import { normalizeEventType, type EventType, type ScheduleFrequency } from "@/lib/types";
 
 async function requireOwnTruckId(): Promise<string> {
   const supabase = createClient();
@@ -421,11 +422,88 @@ export interface EventInput {
   lat: number | null;
   lng: number | null;
   link: string;
+  imageUrl: string | null;
+  eventType: EventType;
+  /** Other trucks the host wants to invite (truck ids). The host is never in
+   *  this list — it's auto-linked as confirmed. */
+  invitedTruckIds: string[];
 }
 
 function revalidateEvents() {
   revalidateEverywhere();
   revalidatePath("/events");
+  revalidatePath("/events/[id]", "page");
+}
+
+function humanDateRange(start: string, end: string): string {
+  const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
+  const s = new Date(`${start}T00:00:00`).toLocaleDateString("en", opts);
+  if (start === end) return s;
+  const e = new Date(`${end}T00:00:00`).toLocaleDateString("en", opts);
+  return `${s} – ${e}`;
+}
+
+/** Add/remove `event_trucks` rows so the non-host links exactly match
+ *  `wantedTruckIds` (status 'invited' for new ones). Emails freshly-invited
+ *  trucks. Never touches the host's own link. Best-effort — collaboration
+ *  failures don't block the event save. */
+async function reconcileInvites(
+  supabase: SupabaseServer,
+  eventId: string,
+  hostTruckId: string,
+  hostTruckName: string,
+  event: { name: string; start_date: string; end_date: string; location_name: string },
+  wantedTruckIds: string[]
+): Promise<void> {
+  const wanted = Array.from(new Set(wantedTruckIds.filter((id) => id && id !== hostTruckId)));
+
+  const { data: existing } = await supabase
+    .from("event_trucks")
+    .select("truck_id")
+    .eq("event_id", eventId);
+  const existingIds = new Set(
+    ((existing ?? []) as { truck_id: string }[]).map((r) => r.truck_id)
+  );
+
+  const toAdd = wanted.filter((id) => !existingIds.has(id));
+  const toRemove = Array.from(existingIds).filter(
+    (id) => id !== hostTruckId && !wanted.includes(id)
+  );
+
+  if (toRemove.length > 0) {
+    await supabase
+      .from("event_trucks")
+      .delete()
+      .eq("event_id", eventId)
+      .in("truck_id", toRemove);
+  }
+
+  if (toAdd.length === 0) return;
+
+  const { error: insErr } = await supabase
+    .from("event_trucks")
+    .insert(toAdd.map((truck_id) => ({ event_id: eventId, truck_id, status: "invited" })));
+  if (insErr) return;
+
+  // Notify the freshly-invited trucks (non-blocking).
+  const { data: trucks } = await supabase
+    .from("trucks")
+    .select("id, name, owner_email")
+    .in("id", toAdd);
+  await Promise.all(
+    ((trucks ?? []) as { id: string; name: string; owner_email: string | null }[])
+      .filter((t) => t.owner_email)
+      .map((t) =>
+        notifyEventInvitation({
+          to: t.owner_email as string,
+          invitedTruckName: t.name,
+          hostTruckName,
+          eventName: event.name,
+          eventDate: humanDateRange(event.start_date, event.end_date),
+          eventLocation: event.location_name,
+        }).catch(() => {})
+      )
+  );
 }
 
 export async function saveOwnEventAction(
@@ -466,9 +544,19 @@ export async function saveOwnEventAction(
     location_lat: lat,
     location_lng: lng,
     link: input.link.trim() || null,
+    image_url: input.imageUrl?.trim() || null,
+    event_type: normalizeEventType(input.eventType),
     created_by_truck_id: truckId,
   };
 
+  const { data: myTruck } = await supabase
+    .from("trucks")
+    .select("name")
+    .eq("id", truckId)
+    .maybeSingle();
+  const hostTruckName = (myTruck as { name?: string } | null)?.name ?? "A food truck";
+
+  let targetId = eventId;
   if (eventId) {
     const { error } = await supabase
       .from("events")
@@ -479,10 +567,22 @@ export async function saveOwnEventAction(
   } else {
     const { data, error } = await supabase.from("events").insert(payload).select("id").single();
     if (error) return { error: error.message };
+    targetId = data.id;
     const { error: linkError } = await supabase
       .from("event_trucks")
-      .insert({ event_id: data.id, truck_id: truckId });
+      .insert({ event_id: data.id, truck_id: truckId, status: "confirmed" });
     if (linkError) return { error: linkError.message };
+  }
+
+  if (targetId) {
+    await reconcileInvites(
+      supabase,
+      targetId,
+      truckId,
+      hostTruckName,
+      { name, start_date: input.startDate, end_date: input.endDate, location_name: location },
+      input.invitedTruckIds ?? []
+    );
   }
 
   revalidateEvents();
@@ -502,6 +602,50 @@ export async function deleteOwnEventAction(eventId: string): Promise<ActionResul
 
   revalidateEvents();
   return { success: true };
+}
+
+/** An invited truck accepts or declines a collaboration invitation. */
+export async function respondToEventInviteAction(
+  eventId: string,
+  response: "confirmed" | "declined"
+): Promise<ActionResult> {
+  const truckId = await requireOwnTruckId();
+  const supabase = createClient();
+
+  const { error } = await supabase
+    .from("event_trucks")
+    .update({ status: response })
+    .eq("event_id", eventId)
+    .eq("truck_id", truckId);
+  if (error) return { error: error.message };
+
+  revalidateEvents();
+  return { success: true };
+}
+
+export interface TruckSearchResult {
+  id: string;
+  name: string;
+  logo_url: string | null;
+}
+
+/** Name search over public trucks for the "invite a truck" picker. Excludes the
+ *  caller's own truck. */
+export async function searchTrucksAction(query: string): Promise<TruckSearchResult[]> {
+  const truckId = await requireOwnTruckId();
+  const supabase = createClient();
+
+  const q = query.trim();
+  let req = supabase
+    .from("public_trucks")
+    .select("id, name, logo_url")
+    .neq("id", truckId)
+    .order("name")
+    .limit(20);
+  if (q) req = req.ilike("name", `%${q}%`);
+
+  const { data } = await req;
+  return (data ?? []) as TruckSearchResult[];
 }
 
 /** Move one photo to the front (sort_order 0) — used by "Set as cover". */

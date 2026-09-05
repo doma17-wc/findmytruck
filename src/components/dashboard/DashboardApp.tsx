@@ -15,7 +15,7 @@ import {
   X,
   ExternalLink,
 } from "lucide-react";
-import type { Truck, TruckSchedule, TruckPhoto, Review, EventWithTrucks } from "@/lib/types";
+import type { Truck, TruckSchedule, TruckPhoto, Review, DashboardEvent } from "@/lib/types";
 import { ToastProvider, Beacon, cn } from "./ui";
 import OverviewPanel from "./panels/OverviewPanel";
 import BoostPanel from "./panels/BoostPanel";
@@ -47,7 +47,7 @@ interface Props {
   schedules: TruckSchedule[];
   photos: TruckPhoto[];
   reviews: Review[];
-  events: EventWithTrucks[];
+  events: { hosting: DashboardEvent[]; attending: DashboardEvent[]; invitations: DashboardEvent[] };
   boosted: boolean;
   boostExpiresAt: string | null;
   boostStartedAt: string | null;
@@ -98,6 +98,7 @@ export default function DashboardApp(props: Props) {
   };
 
   const heading = HEADINGS[active];
+  const pendingInvites = props.events.invitations.length;
 
   const sidebar = (
     <div className="flex h-full flex-col gap-6 bg-ink p-4 text-white">
@@ -147,6 +148,16 @@ export default function DashboardApp(props: Props) {
           >
             <Icon className="h-[18px] w-[18px]" />
             {label}
+            {key === "events" && pendingInvites > 0 && (
+              <span
+                className={cn(
+                  "ml-auto flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold",
+                  active === key ? "bg-white text-accent" : "bg-accent text-white"
+                )}
+              >
+                {pendingInvites}
+              </span>
+            )}
           </button>
         ))}
       </nav>
@@ -218,7 +229,14 @@ export default function DashboardApp(props: Props) {
               {active === "boost" && <BoostPanel {...props} />}
               {active === "menu" && <MenuPanel truck={truck} />}
               {active === "schedule" && <SchedulePanel schedules={props.schedules} />}
-              {active === "events" && <EventsPanel events={props.events} />}
+              {active === "events" && (
+                <EventsPanel
+                  truckName={truck.name}
+                  hosting={props.events.hosting}
+                  attending={props.events.attending}
+                  invitations={props.events.invitations}
+                />
+              )}
               {active === "reviews" && <ReviewsPanel reviews={props.reviews} />}
               {active === "insights" && <InsightsPanel stats={props.stats} />}
               {active === "settings" && (
