@@ -35,6 +35,10 @@ export interface AppProfile {
   truck_id: string | null;
   display_name: string | null;
   created_at: string;
+  /** Follow-notification opt-in (migration 0013). Defaults to true. */
+  notify_follow_live?: boolean | null;
+  /** Opaque token for one-click e-mail unsubscribe (migration 0013). */
+  notify_token?: string | null;
 }
 
 /** Current signed-in user + their profile row, or null if signed out. */

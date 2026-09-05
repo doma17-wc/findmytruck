@@ -9,6 +9,7 @@ import TrucksTab from "./TrucksTab";
 import ClaimsTab from "./ClaimsTab";
 import UsersTab from "./UsersTab";
 import AdminEventsTab from "./AdminEventsTab";
+import SettingsTab from "./SettingsTab";
 
 export interface AdminTruck extends Truck {
   scans: number;
@@ -29,7 +30,7 @@ export interface AdminUser {
   display_name: string | null;
 }
 
-type Tab = "overview" | "trucks" | "claims" | "events" | "users";
+type Tab = "overview" | "trucks" | "claims" | "events" | "users" | "settings";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "overview", label: "Overview" },
@@ -37,6 +38,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "claims", label: "Claims" },
   { key: "events", label: "Events" },
   { key: "users", label: "Users" },
+  { key: "settings", label: "Settings" },
 ];
 
 export default function AdminApp({
@@ -44,11 +46,13 @@ export default function AdminApp({
   users,
   events,
   hasServiceRole,
+  reviewsRequireLogin,
 }: {
   trucks: AdminTruck[];
   users: AdminUser[] | null;
   events: EventWithTrucks[];
   hasServiceRole: boolean;
+  reviewsRequireLogin: boolean;
 }) {
   const [tab, setTab] = useState<Tab>("overview");
 
@@ -187,6 +191,7 @@ export default function AdminApp({
           />
         )}
         {tab === "users" && <UsersTab users={users} hasServiceRole={hasServiceRole} />}
+        {tab === "settings" && <SettingsTab reviewsRequireLogin={reviewsRequireLogin} />}
       </div>
     </div>
   );

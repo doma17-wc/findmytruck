@@ -1,5 +1,6 @@
 import Link from "next/link";
 import UserMenu from "./UserMenu";
+import NotificationBell from "@/components/notifications/NotificationBell";
 import type { AppProfile } from "@/lib/supabase/server";
 
 interface HeaderProps {
@@ -38,7 +39,10 @@ export default function Header({ auth }: HeaderProps) {
 
         <div className="flex items-center gap-2">
           {auth ? (
-            <UserMenu email={auth.user.email ?? ""} profile={auth.profile} />
+            <>
+              <NotificationBell tone="dark" />
+              <UserMenu email={auth.user.email ?? ""} profile={auth.profile} />
+            </>
           ) : (
             <div className="flex items-center gap-2">
               <Link

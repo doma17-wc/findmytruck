@@ -5,7 +5,7 @@ import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
 import type { PublicTruck } from "@/lib/types";
 import FavoriteButton from "@/components/FavoriteButton";
 
-export const metadata = { title: "My favorites" };
+export const metadata = { title: "Trucks you follow" };
 export const dynamic = "force-dynamic";
 
 export default async function FavoritesPage() {
@@ -26,16 +26,16 @@ export default async function FavoritesPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8">
-      <h1 className="text-2xl font-bold text-neutral-900">My favorites</h1>
+      <h1 className="text-2xl font-bold text-neutral-900">Trucks you follow</h1>
       <p className="mt-1 text-sm text-neutral-500">
-        {trucks.length} truck{trucks.length === 1 ? "" : "s"} you&apos;re following.
+        {trucks.length} truck{trucks.length === 1 ? "" : "s"} · you get an alert when they go live.
       </p>
 
       {trucks.length === 0 ? (
         <div className="mt-10 rounded-2xl border border-dashed border-neutral-200 py-14 text-center">
           <p className="text-3xl">🚚</p>
           <p className="mt-3 text-sm text-neutral-500">
-            No favorites yet. Tap the heart on a truck to save it here.
+            You&apos;re not following any trucks yet. Tap the heart on a truck to follow it.
           </p>
           <Link
             href="/"

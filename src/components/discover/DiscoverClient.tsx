@@ -46,6 +46,7 @@ interface DiscoverClientProps {
   eventsByTruck?: Record<string, EventWithTrucks[]>;
   auth: { email: string; profile: AppProfile | null } | null;
   favoritedIds: string[];
+  reviewsRequireLogin?: boolean;
 }
 
 export default function DiscoverClient({
@@ -54,6 +55,7 @@ export default function DiscoverClient({
   eventsByTruck = {},
   auth,
   favoritedIds,
+  reviewsRequireLogin = false,
 }: DiscoverClientProps) {
   const signedIn = Boolean(auth);
   const favoritedSet = useMemo(() => new Set(favoritedIds), [favoritedIds]);
@@ -419,6 +421,7 @@ export default function DiscoverClient({
           signedIn={signedIn}
           favorited={favoritedSet.has(selectedEntry.truck.id)}
           isOwnerView={ownTruckId === selectedEntry.truck.id}
+          reviewsRequireLogin={reviewsRequireLogin}
           onClose={() => setSelectedId(null)}
         />
       )}

@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getAllActiveTrucks } from "@/lib/data";
+import { getAllTruckRatings } from "@/lib/reviews";
 import { getCity } from "@/lib/cities";
 import CityBrowseClient from "@/components/CityBrowseClient";
 
@@ -29,7 +30,7 @@ export const metadata: Metadata = city
 export default async function CityPage() {
   if (!city) notFound();
 
-  const trucks = await getAllActiveTrucks();
+  const [trucks, ratings] = await Promise.all([getAllActiveTrucks(), getAllTruckRatings()]);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 pb-16">
@@ -41,7 +42,7 @@ export default async function CityPage() {
         city. Tap a truck to see its full schedule, menu, and location.
       </p>
 
-      <CityBrowseClient trucks={trucks} />
+      <CityBrowseClient trucks={trucks} ratings={ratings} />
 
       {trucks.length === 0 && (
         <p className="mt-8 text-center text-sm text-neutral-500">

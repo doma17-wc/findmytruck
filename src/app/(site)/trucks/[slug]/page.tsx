@@ -6,6 +6,10 @@ import { ArrowLeft, BadgeCheck, Globe, MapPin, Music2, Navigation, PartyPopper }
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import { getTruckBySlug, getTruckPhotos, getTruckSchedule } from "@/lib/data";
 import { getEventsForTruck } from "@/lib/events";
+import { getReviewsForTruck, summarize } from "@/lib/reviews";
+import { getBooleanSetting } from "@/lib/settings";
+import ReviewsSection from "@/components/reviews/ReviewsSection";
+import { StarRow } from "@/components/reviews/Stars";
 import { DAY_LABELS, DAY_LABELS_SHORT } from "@/lib/types";
 import { normalizeMenuItems } from "@/lib/menu";
 import { isUnclaimed, UNCLAIMED_BADGE } from "@/lib/unclaimed";
@@ -67,12 +71,16 @@ export default async function TruckProfilePage({ params }: PageProps) {
   const truck = await getTruckBySlug(params.slug);
   if (!truck) notFound();
 
-  const [schedule, photos, auth, events] = await Promise.all([
+  const [schedule, photos, auth, events, reviews, reviewsRequireLogin] = await Promise.all([
     getTruckSchedule(truck.id),
     getTruckPhotos(truck.id),
     getCurrentUserProfile(),
     getEventsForTruck(truck.id, { upcomingOnly: true }),
+    getReviewsForTruck(truck.id),
+    getBooleanSetting("reviews_require_login", false),
   ]);
+
+  const reviewSummary = summarize(reviews);
 
   const supabase = createClient();
 
@@ -131,6 +139,15 @@ export default async function TruckProfilePage({ params }: PageProps) {
       opens: s.start_time.slice(0, 5),
       closes: s.end_time.slice(0, 5),
     })),
+    ...(reviewSummary.count > 0 && {
+      aggregateRating: {
+        "@type": "AggregateRating",
+        ratingValue: reviewSummary.avg,
+        reviewCount: reviewSummary.count,
+        bestRating: 5,
+        worstRating: 1,
+      },
+    }),
   };
 
   return (
@@ -218,11 +235,32 @@ export default async function TruckProfilePage({ params }: PageProps) {
             )}
           </div>
 
+          {reviewSummary.count > 0 && (
+            <a
+              href="#reviews"
+              className="mt-2 inline-flex items-center gap-2 text-sm text-neutral-600 hover:text-neutral-900"
+            >
+              <StarRow rating={reviewSummary.avg} size={15} />
+              <span className="font-bold text-neutral-900">{reviewSummary.avg.toFixed(1)}</span>
+              <span className="text-neutral-500">
+                · {reviewSummary.count} review{reviewSummary.count === 1 ? "" : "s"}
+              </span>
+            </a>
+          )}
+
           {truck.description && (
             <p className="mt-4 text-[15px] leading-relaxed text-neutral-700">{truck.description}</p>
           )}
 
           <div className="mt-5 flex flex-wrap gap-2">
+            {!isOwnerView && (
+              <FavoriteButton
+                truckId={truck.id}
+                initialFavorited={isFavorited}
+                signedIn={Boolean(auth)}
+                variant="pill"
+              />
+            )}
             {directionsUrl && (
               <a
                 href={directionsUrl}
@@ -454,6 +492,16 @@ export default async function TruckProfilePage({ params }: PageProps) {
               </div>
             </section>
           )}
+
+          <div id="reviews" className="scroll-mt-20">
+            <ReviewsSection
+              truckId={truck.id}
+              truckName={truck.name}
+              signedIn={Boolean(auth)}
+              requireLogin={reviewsRequireLogin}
+              initialReviews={reviews}
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -17,4 +17,5 @@ export async function toggleFavoriteAction(truckId: string, isFavorited: boolean
   }
 
   revalidatePath("/favorites");
+  revalidatePath("/account");
 }

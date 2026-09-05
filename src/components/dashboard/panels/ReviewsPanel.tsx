@@ -63,6 +63,22 @@ function ReviewCard({ review }: { review: Review }) {
 
         {review.text && <p className="text-sm leading-relaxed text-ink-soft">{review.text}</p>}
 
+        {review.photo_url && (
+          <a
+            href={review.photo_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-fit overflow-hidden rounded-xl border border-line"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={review.photo_url}
+              alt={`Dish photographed by ${review.author_name}`}
+              className="h-36 w-36 object-cover"
+            />
+          </a>
+        )}
+
         {review.reply && !editing && (
           <div className="rounded-xl bg-paper-deep p-3">
             <p className="text-xs font-bold uppercase tracking-wide text-muted">Your reply</p>
@@ -131,8 +147,23 @@ export default function ReviewsPanel({ reviews }: { reviews: Review[] }) {
     );
   }
 
+  const avg =
+    Math.round((reviews.reduce((s, r) => s + r.rating, 0) / reviews.length) * 10) / 10;
+
   return (
     <div className="space-y-4">
+      <Card>
+        <CardBody className="flex items-center gap-3 py-4">
+          <div className="flex items-baseline gap-1">
+            <span className="font-display text-3xl font-extrabold text-ink">{avg.toFixed(1)}</span>
+            <Star className="h-5 w-5 fill-amber text-amber" />
+          </div>
+          <div className="text-sm text-muted">
+            {reviews.length} review{reviews.length === 1 ? "" : "s"} · reply to build trust with
+            customers
+          </div>
+        </CardBody>
+      </Card>
       {reviews.map((r) => (
         <ReviewCard key={r.id} review={r} />
       ))}

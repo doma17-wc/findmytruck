@@ -255,3 +255,45 @@ export async function notifyEventInvitation(input: EventInvitationInput): Promis
     text,
   });
 }
+
+/** ---------- Feature 4: a followed truck just went live (boost) ---------- */
+
+interface FollowerTruckLiveInput {
+  to: string;
+  truckName: string;
+  location: string | null;
+  truckUrl: string;
+  unsubscribeUrl: string;
+}
+
+export async function notifyFollowerTruckLive(input: FollowerTruckLiveInput): Promise<void> {
+  const near = input.location ? ` near ${input.location}` : "";
+  const subject = `🚚 ${input.truckName} is live now${near}`;
+
+  const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,sans-serif;max-width:520px;">
+    <h2 style="font-size:18px;color:#191817;margin:0 0 4px;">${esc(input.truckName)} is serving now</h2>
+    <p style="font-size:14px;color:#4A4642;margin:0 0 16px;">
+      A truck you follow on FindMyTruck just went live${esc(near)}. Catch them while they're parked.
+    </p>
+    <p style="margin:0 0 20px;">
+      <a href="${esc(input.truckUrl)}" style="display:inline-block;background:#FF6A00;color:#fff;
+        font-size:14px;font-weight:700;text-decoration:none;padding:10px 18px;border-radius:10px;">
+        See where they are
+      </a>
+    </p>
+    <p style="font-size:12px;color:#8C867E;margin:0;">
+      You're getting this because you follow ${esc(input.truckName)}.
+      <a href="${esc(input.unsubscribeUrl)}" style="color:#8C867E;">Turn these e-mails off</a>.
+    </p>
+  </div>`;
+
+  const text = [
+    `${input.truckName} is live now${near}.`,
+    "",
+    `See where they are: ${input.truckUrl}`,
+    "",
+    `Turn these e-mails off: ${input.unsubscribeUrl}`,
+  ].join("\n");
+
+  await sendEmail({ to: input.to, subject, html, text });
+}

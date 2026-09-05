@@ -3,10 +3,21 @@
 import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Search, Star } from "lucide-react";
 import type { PublicTruck } from "@/lib/types";
 
-export default function CityBrowseClient({ trucks }: { trucks: PublicTruck[] }) {
+interface Rating {
+  avg: number;
+  count: number;
+}
+
+export default function CityBrowseClient({
+  trucks,
+  ratings = {},
+}: {
+  trucks: PublicTruck[];
+  ratings?: Record<string, Rating>;
+}) {
   const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
@@ -50,7 +61,18 @@ export default function CityBrowseClient({ trucks }: { trucks: PublicTruck[] }) 
               )}
             </div>
             <div className="p-4">
-              <h2 className="text-base font-bold text-neutral-900">{truck.name}</h2>
+              <div className="flex items-start justify-between gap-2">
+                <h2 className="text-base font-bold text-neutral-900">{truck.name}</h2>
+                {(ratings[truck.id]?.count ?? 0) > 0 && (
+                  <span className="inline-flex flex-shrink-0 items-center gap-1 text-xs font-bold text-neutral-700">
+                    <Star className="h-3.5 w-3.5" fill="#F59E0B" color="#F59E0B" />
+                    {ratings[truck.id].avg.toFixed(1)}
+                    <span className="font-medium text-neutral-400">
+                      ({ratings[truck.id].count})
+                    </span>
+                  </span>
+                )}
+              </div>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {truck.cuisine_type.slice(0, 3).map((c) => (
                   <span

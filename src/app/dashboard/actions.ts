@@ -7,7 +7,7 @@ import { geocode } from "@/lib/geocode";
 import { getMondayFirstDay } from "@/lib/geo";
 import { DEFAULT_MAP_CENTER } from "@/lib/cities";
 import { PHOTO_BUCKET, storagePathFromPublicUrl } from "@/lib/storage";
-import { notifyEventInvitation } from "@/lib/email";
+import { notifyEventInvitation, notifyFollowerTruckLive } from "@/lib/email";
 import { normalizeEventType, type EventType, type ScheduleFrequency } from "@/lib/types";
 
 async function requireOwnTruckId(): Promise<string> {
@@ -231,6 +231,57 @@ export interface BoostInput {
   /** Optional GPS captured with the owner's permission to refine the pin. */
   lat: number | null;
   lng: number | null;
+  /** The pitch / location name the owner picked, for the follower notification. */
+  locationName?: string | null;
+}
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://findmytruck.ch";
+
+/** Fan out "a truck you follow is live" to its followers — in-app for everyone,
+ *  e-mail for those opted in. Idempotent per truck per day (enforced in the
+ *  RPC). Best-effort: never blocks or fails the boost. */
+async function notifyFollowersOfBoost(
+  supabase: ReturnType<typeof createClient>,
+  truckId: string,
+  locationName: string | null
+) {
+  try {
+    const { data: truck } = await supabase
+      .from("trucks")
+      .select("name, slug")
+      .eq("id", truckId)
+      .maybeSingle();
+    if (!truck) return;
+
+    const near = locationName ? ` near ${locationName}` : "";
+    const message = `${truck.name} is live now${near}`;
+    const link = `/trucks/${truck.slug}`;
+
+    const { data: recipients, error } = await supabase.rpc("notify_followers_truck_live", {
+      p_truck_id: truckId,
+      p_message: message,
+      p_link: link,
+    });
+    if (error) {
+      console.error("[boost] notify_followers_truck_live failed:", error.message);
+      return;
+    }
+
+    const rows = (recipients ?? []) as { email: string; token: string }[];
+    await Promise.all(
+      rows.map((r) =>
+        notifyFollowerTruckLive({
+          to: r.email,
+          truckName: truck.name,
+          location: locationName,
+          truckUrl: `${SITE_URL}/trucks/${truck.slug}`,
+          unsubscribeUrl: `${SITE_URL}/unsubscribe?t=${r.token}`,
+        }).catch(() => {})
+      )
+    );
+  } catch (err) {
+    console.error("[boost] follower notification threw:", err);
+  }
 }
 
 export async function boostAction(input: BoostInput): Promise<ActionResult> {
@@ -242,7 +293,7 @@ export async function boostAction(input: BoostInput): Promise<ActionResult> {
   // Expiry = end of today's active recurring slot, else +4h.
   const { data: rows } = await supabase
     .from("truck_schedules")
-    .select("day_of_week, start_time, end_time, specific_date")
+    .select("day_of_week, start_time, end_time, specific_date, location_name")
     .eq("truck_id", truckId)
     .is("specific_date", null);
 
@@ -283,6 +334,12 @@ export async function boostAction(input: BoostInput): Promise<ActionResult> {
     })
     .eq("id", truckId);
   if (error) return { error: error.message };
+
+  await notifyFollowersOfBoost(
+    supabase,
+    truckId,
+    (input.locationName ?? active?.location_name ?? "").trim() || null
+  );
 
   revalidateEverywhere();
   return { success: true };

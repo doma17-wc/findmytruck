@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { supabase } from "@/lib/supabase";
 import { getServiceSupabase } from "@/lib/supabase/admin";
 import { normalizeMenuItems } from "@/lib/menu";
+import { setAppSetting } from "@/lib/settings";
 import { ADMIN_COOKIE, hashAdminPassword } from "@/lib/adminAuth";
 
 // ---------- Auth ----------
@@ -209,6 +210,17 @@ export async function setBoostOverrideAction(truckId: string, on: boolean) {
   const { error } = await supabase.from("trucks").update(payload).eq("id", truckId);
   if (error) return { error: error.message };
   revalidatePublic();
+  return { success: true };
+}
+
+// ---------- Platform settings ----------
+
+/** Toggle "only logged-in customers can leave reviews" (migration 0013). */
+export async function setReviewsRequireLoginAction(on: boolean) {
+  const res = await setAppSetting("reviews_require_login", on);
+  if (res.error) return { error: res.error };
+  revalidatePublic();
+  revalidatePath("/admin");
   return { success: true };
 }
 

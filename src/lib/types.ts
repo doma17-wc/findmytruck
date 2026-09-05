@@ -225,11 +225,26 @@ export interface TruckPhoto {
 export interface Review {
   id: string;
   truck_id: string;
+  /** Nullable "author_id" — set when a signed-in customer left the review. */
   user_id: string | null;
   author_name: string;
   rating: number;
   text: string | null;
+  /** Optional dish photo (migration 0013). Absent on rows read before it. */
+  photo_url?: string | null;
   reply: string | null;
+  created_at: string;
+}
+
+/** In-app notification feed (migration 0013). */
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: string;
+  truck_id: string | null;
+  message: string;
+  link: string | null;
+  read: boolean;
   created_at: string;
 }
 

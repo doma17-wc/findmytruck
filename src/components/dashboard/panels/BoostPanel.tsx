@@ -78,7 +78,11 @@ export default function BoostPanel({
       return;
     }
     startTransition(async () => {
-      const res = await boostAction({ lat: loc.lat, lng: loc.lng });
+      const res = await boostAction({
+        lat: loc.lat,
+        lng: loc.lng,
+        locationName: activePitch?.location_name ?? null,
+      });
       if (res.error) toast(res.error, "error");
       else toast("Boosted — you're at the top of the map");
     });

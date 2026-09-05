@@ -26,6 +26,7 @@ import { formatTimeRange, getMondayFirstDay } from "@/lib/geo";
 import { isUnclaimed } from "@/lib/unclaimed";
 import { createClient } from "@/lib/supabase/client";
 import { recordTruckView } from "@/lib/trackView";
+import ReviewsSection from "@/components/reviews/ReviewsSection";
 import type { DiscoverEntry } from "./types";
 import { RatingBadge } from "./Bits";
 import { dietaryPills } from "./helpers";
@@ -36,6 +37,7 @@ interface DetailSheetProps {
   signedIn: boolean;
   favorited: boolean;
   isOwnerView: boolean;
+  reviewsRequireLogin?: boolean;
   onClose: () => void;
 }
 
@@ -59,6 +61,7 @@ export default function DetailSheet({
   signedIn,
   favorited,
   isOwnerView,
+  reviewsRequireLogin = false,
   onClose,
 }: DetailSheetProps) {
   const { truck, status, schedules, rating, events } = entry;
@@ -296,12 +299,14 @@ export default function DetailSheet({
                 {truck.price_range && <span className="opacity-70">· {truck.price_range}</span>}
               </div>
             </div>
-            <FavoriteButton
-              truckId={truck.id}
-              initialFavorited={favorited}
-              signedIn={signedIn}
-              size="md"
-            />
+            {!isOwnerView && (
+              <FavoriteButton
+                truckId={truck.id}
+                initialFavorited={favorited}
+                signedIn={signedIn}
+                variant="pill"
+              />
+            )}
           </div>
 
           <div className="mt-2.5 flex flex-wrap items-center gap-2">
@@ -552,6 +557,14 @@ export default function DetailSheet({
               </Link>
             </div>
           )}
+
+          <ReviewsSection
+            truckId={truck.id}
+            truckName={truck.name}
+            signedIn={signedIn}
+            requireLogin={reviewsRequireLogin}
+            compact
+          />
 
           <Link
             href={`/trucks/${truck.slug}`}

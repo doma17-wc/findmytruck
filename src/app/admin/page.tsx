@@ -3,6 +3,7 @@ import { getServiceSupabase } from "@/lib/supabase/admin";
 import { readBoost, isBoostActive } from "@/lib/geo";
 import type { Truck, QrRedirect } from "@/lib/types";
 import { getAllUpcomingEvents } from "@/lib/events";
+import { getBooleanSetting } from "@/lib/settings";
 import AdminApp, { type AdminTruck, type AdminUser } from "@/components/admin/AdminApp";
 
 export const dynamic = "force-dynamic";
@@ -46,6 +47,8 @@ export default async function AdminDashboardPage() {
       .gte("viewed_at", thirtyDaysAgo.toISOString()),
     getAllUpcomingEvents(),
   ]);
+
+  const reviewsRequireLogin = await getBooleanSetting("reviews_require_login", false);
 
   const scansByTruck = new Map<string, number>();
   ((redirects ?? []) as Pick<QrRedirect, "truck_id" | "scan_count">[]).forEach((r) => {
@@ -112,5 +115,13 @@ export default async function AdminDashboardPage() {
     users.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   }
 
-  return <AdminApp trucks={trucks} users={users} events={events} hasServiceRole={Boolean(service)} />;
+  return (
+    <AdminApp
+      trucks={trucks}
+      users={users}
+      events={events}
+      hasServiceRole={Boolean(service)}
+      reviewsRequireLogin={reviewsRequireLogin}
+    />
+  );
 }

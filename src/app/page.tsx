@@ -1,35 +1,18 @@
 import DiscoverClient from "@/components/discover/DiscoverClient";
-import type { TruckRating } from "@/components/discover/types";
 import { getAllTrucksWithSchedules } from "@/lib/data";
 import { getUpcomingEventsByTruck } from "@/lib/events";
-import { supabase } from "@/lib/supabase";
+import { getAllTruckRatings } from "@/lib/reviews";
+import { getBooleanSetting } from "@/lib/settings";
 import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
 
 export const revalidate = 60;
 
-async function getRatings(): Promise<Record<string, TruckRating>> {
-  const { data, error } = await supabase.from("reviews").select("truck_id, rating");
-  if (error || !data) return {};
-
-  const acc: Record<string, { sum: number; count: number }> = {};
-  for (const row of data as { truck_id: string; rating: number }[]) {
-    const a = (acc[row.truck_id] ??= { sum: 0, count: 0 });
-    a.sum += row.rating;
-    a.count += 1;
-  }
-
-  const out: Record<string, TruckRating> = {};
-  for (const [id, { sum, count }] of Object.entries(acc)) {
-    out[id] = { avg: Math.round((sum / count) * 10) / 10, count };
-  }
-  return out;
-}
-
 export default async function HomePage() {
-  const [trucks, ratings, auth] = await Promise.all([
+  const [trucks, ratings, auth, reviewsRequireLogin] = await Promise.all([
     getAllTrucksWithSchedules(),
-    getRatings(),
+    getAllTruckRatings(),
     getCurrentUserProfile(),
+    getBooleanSetting("reviews_require_login", false),
   ]);
   const eventsByTruck = await getUpcomingEventsByTruck(trucks.map((t) => t.truck.id));
 
@@ -50,6 +33,7 @@ export default async function HomePage() {
       eventsByTruck={eventsByTruck}
       auth={auth ? { email: auth.user.email ?? "", profile: auth.profile } : null}
       favoritedIds={favoritedIds}
+      reviewsRequireLogin={reviewsRequireLogin}
     />
   );
 }

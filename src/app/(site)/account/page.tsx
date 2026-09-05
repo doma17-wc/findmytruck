@@ -1,9 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CalendarDays, LayoutDashboard, Heart, LogOut, MapPin } from "lucide-react";
+import { Bell, CalendarDays, LayoutDashboard, Heart, LogOut, MapPin, Zap } from "lucide-react";
 import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
 import { dateStr } from "@/lib/events";
 import { formatEventDateRange } from "@/lib/eventFormat";
+import type { Notification } from "@/lib/types";
+import NotifyPreferenceToggle from "@/components/notifications/NotifyPreferenceToggle";
 import { signOutAction } from "../auth-actions";
 
 export const metadata = { title: "Your profile" };
@@ -26,12 +28,25 @@ export default async function AccountPage() {
   const isOwner = profile?.role === "truck_owner";
 
   let interestedEvents: InterestedEvent[] = [];
+  let notifications: Notification[] = [];
+  let followedCount = 0;
   if (!isOwner) {
     const supabase = createClient();
-    const { data: rsvps } = await supabase
-      .from("event_rsvps")
-      .select("event_id")
-      .eq("user_id", user.id);
+    const [{ data: rsvps }, { data: notifs }, { count: favCount }] = await Promise.all([
+      supabase.from("event_rsvps").select("event_id").eq("user_id", user.id),
+      supabase
+        .from("notifications")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(10),
+      supabase
+        .from("user_favorites")
+        .select("truck_id", { count: "exact", head: true })
+        .eq("user_id", user.id),
+    ]);
+    notifications = (notifs as Notification[]) ?? [];
+    followedCount = favCount ?? 0;
+
     const ids = ((rsvps ?? []) as { event_id: string }[]).map((r) => r.event_id);
     if (ids.length > 0) {
       const { data: evs } = await supabase
@@ -43,6 +58,8 @@ export default async function AccountPage() {
       interestedEvents = (evs ?? []) as InterestedEvent[];
     }
   }
+
+  const notifyOn = profile?.notify_follow_live ?? true;
 
   return (
     <div className="mx-auto max-w-md px-4 py-10">
@@ -78,7 +95,12 @@ export default async function AccountPage() {
               className="flex items-center gap-3 rounded-xl border border-neutral-100 px-4 py-3 text-sm font-semibold text-neutral-800 transition hover:bg-neutral-50"
             >
               <Heart className="h-[18px] w-[18px] text-brand" />
-              My favorites
+              Trucks you follow
+              {followedCount > 0 && (
+                <span className="ml-auto rounded-full bg-brand-50 px-2 py-0.5 text-xs font-bold text-brand">
+                  {followedCount}
+                </span>
+              )}
             </Link>
           )}
 
@@ -93,6 +115,64 @@ export default async function AccountPage() {
           </form>
         </div>
       </div>
+
+      {!isOwner && (
+        <div className="mt-6 rounded-2xl border border-neutral-100 bg-white p-6 shadow-card">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-neutral-900">
+            <Bell className="h-[18px] w-[18px] text-brand" />
+            Notifications
+          </h2>
+
+          <div className="mt-4">
+            <NotifyPreferenceToggle initialOn={notifyOn} />
+          </div>
+
+          <div className="mt-4 border-t border-neutral-100 pt-4">
+            {notifications.length === 0 ? (
+              <p className="text-sm text-neutral-500">
+                No notifications yet. Follow a truck and you&apos;ll hear when it goes live.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {notifications.map((n) => {
+                  const row = (
+                    <div className="flex items-start gap-2.5">
+                      <span className="mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand">
+                        <Zap className="h-3.5 w-3.5" fill="currentColor" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm text-neutral-800">{n.message}</p>
+                        <p className="mt-0.5 text-xs text-neutral-400">
+                          {new Date(n.created_at).toLocaleString("en", {
+                            day: "numeric",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                  return (
+                    <li key={n.id}>
+                      {n.link ? (
+                        <Link
+                          href={n.link}
+                          className="block rounded-xl p-2 transition hover:bg-neutral-50"
+                        >
+                          {row}
+                        </Link>
+                      ) : (
+                        <div className="p-2">{row}</div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
 
       {!isOwner && (
         <div className="mt-6 rounded-2xl border border-neutral-100 bg-white p-6 shadow-card">

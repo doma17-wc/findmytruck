@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import UserMenu from "@/components/site/UserMenu";
+import NotificationBell from "@/components/notifications/NotificationBell";
 import type { AppProfile } from "@/lib/supabase/server";
 
 interface DiscoverHeaderProps {
@@ -73,7 +74,10 @@ export default function DiscoverHeader({ auth }: DiscoverHeaderProps) {
         </div>
 
         {auth ? (
-          <UserMenu email={auth.email} profile={auth.profile} />
+          <>
+            <NotificationBell tone="light" />
+            <UserMenu email={auth.email} profile={auth.profile} />
+          </>
         ) : (
           <>
             <Link
