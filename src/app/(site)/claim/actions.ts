@@ -2,8 +2,10 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { notifyTruckJoined } from "@/lib/email";
+import { DASH_TRUCK_COOKIE } from "@/lib/dashboardTruck";
 
 export interface ClaimFormState {
   error?: string;
@@ -58,7 +60,9 @@ export async function claimTruckAction(
     }
   }
 
-  const { error: rpcError } = await supabase.rpc("claim_truck", { p_slug: slug });
+  const { data: claimedTruckId, error: rpcError } = await supabase.rpc("claim_truck", {
+    p_slug: slug,
+  });
   if (rpcError) return { error: rpcError.message };
 
   // Non-blocking owner notification — a failure here must never break the claim.
@@ -78,7 +82,20 @@ export async function claimTruckAction(
     console.error("[claim] notification failed:", err);
   }
 
+  // Land the owner on the truck they just claimed (they may already manage
+  // others — multi-truck per account, migration 0014).
+  if (claimedTruckId) {
+    cookies().set(DASH_TRUCK_COOKIE, claimedTruckId as string, {
+      httpOnly: false,
+      sameSite: "lax",
+      path: "/dashboard",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
+
   revalidatePath("/", "layout");
   revalidatePath(`/trucks/${slug}`);
-  redirect("/dashboard?claimed=1");
+  redirect(
+    claimedTruckId ? `/dashboard?truck=${claimedTruckId}&claimed=1` : "/dashboard?claimed=1"
+  );
 }

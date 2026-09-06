@@ -14,8 +14,7 @@ export default async function ClaimProfilePage({ params }: { params: { slug: str
 
   const auth = await getCurrentUserProfile();
   const status = truck.claim_status ?? "unclaimed";
-  const alreadyLinkedToOther =
-    Boolean(auth?.profile?.truck_id) && auth?.profile?.truck_id !== truck.id;
+  const alreadyMine = (auth?.ownedTruckIds ?? []).includes(truck.id);
 
   return (
     <div className="flex min-h-[calc(100dvh-3.5rem)] items-center justify-center bg-neutral-50 px-4 py-10">
@@ -44,15 +43,23 @@ export default async function ClaimProfilePage({ params }: { params: { slug: str
               that was you, sign in to reach your dashboard.
             </span>
           </div>
-        ) : alreadyLinkedToOther ? (
-          <div className="mt-4 rounded-xl bg-neutral-50 px-3 py-3 text-sm text-neutral-600">
-            Your account is already linked to a different truck, so it can&apos;t claim this one.
-            Contact us if that&apos;s not right.
+        ) : alreadyMine ? (
+          <div className="mt-4 flex items-start gap-2 rounded-xl bg-green-50 px-3 py-3 text-sm text-green-700">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 flex-shrink-0" />
+            <span>
+              You already manage this truck.{" "}
+              <Link href="/dashboard" className="font-semibold underline">
+                Open the dashboard
+              </Link>
+              .
+            </span>
           </div>
         ) : (
           <>
             <p className="mt-1 text-sm text-neutral-500">
-              Take ownership of this listing to manage its schedule, menu, and photos.
+              {auth
+                ? "Add this truck to your account and manage its schedule, menu, and photos alongside your other trucks."
+                : "Take ownership of this listing to manage its schedule, menu, and photos."}
             </p>
             <div className="mt-6">
               <ClaimForm slug={truck.slug} truckName={truck.name} signedIn={Boolean(auth)} />

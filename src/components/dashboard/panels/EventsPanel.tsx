@@ -45,10 +45,12 @@ function formatDateRange(start: string, end: string): string {
 /* ------------------------- invite-a-truck picker ------------------------- */
 
 function InvitePicker({
+  truckId,
   selected,
   knownNames,
   onChange,
 }: {
+  truckId: string;
   selected: string[];
   knownNames: Record<string, { name: string; logo_url: string | null }>;
   onChange: (ids: string[]) => void;
@@ -60,7 +62,7 @@ function InvitePicker({
   const runSearch = (q: string) => {
     setQuery(q);
     startSearch(async () => {
-      setResults(await searchTrucksAction(q));
+      setResults(await searchTrucksAction(truckId, q));
     });
   };
 
@@ -148,11 +150,13 @@ function InvitePicker({
 /* --------------------------------- panel --------------------------------- */
 
 export default function EventsPanel({
+  truckId,
   truckName,
   hosting,
   attending,
   invitations,
 }: {
+  truckId: string;
   truckName: string;
   hosting: DashboardEvent[];
   attending: DashboardEvent[];
@@ -208,7 +212,7 @@ export default function EventsPanel({
 
   const save = () => {
     startTransition(async () => {
-      const res = await saveOwnEventAction(editingId, form);
+      const res = await saveOwnEventAction(truckId, editingId, form);
       if (res.error) {
         toast(res.error, "error");
         return;
@@ -220,7 +224,7 @@ export default function EventsPanel({
 
   const remove = (id: string) => {
     startTransition(async () => {
-      const res = await deleteOwnEventAction(id);
+      const res = await deleteOwnEventAction(truckId, id);
       if (res.error) toast(res.error, "error");
       else toast("Event removed");
     });
@@ -228,7 +232,7 @@ export default function EventsPanel({
 
   const respond = (id: string, response: "confirmed" | "declined") => {
     startTransition(async () => {
-      const res = await respondToEventInviteAction(id, response);
+      const res = await respondToEventInviteAction(truckId, id, response);
       if (res.error) toast(res.error, "error");
       else toast(response === "confirmed" ? "Invitation accepted" : "Invitation declined");
     });
@@ -368,6 +372,7 @@ export default function EventsPanel({
             />
 
             <InvitePicker
+              truckId={truckId}
               selected={form.invitedTruckIds}
               knownNames={knownNames}
               onChange={(invitedTruckIds) => {

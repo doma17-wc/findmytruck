@@ -105,7 +105,13 @@ function FrequencyPicker({ day, patch }: { day: DayState; patch: (p: Partial<Day
   );
 }
 
-export default function SchedulePanel({ schedules }: { schedules: TruckSchedule[] }) {
+export default function SchedulePanel({
+  truckId,
+  schedules,
+}: {
+  truckId: string;
+  schedules: TruckSchedule[];
+}) {
   const toast = useToast();
   const [pending, startTransition] = useTransition();
   const today = useMemo(() => getMondayFirstDay(), []);
@@ -130,7 +136,7 @@ export default function SchedulePanel({ schedules }: { schedules: TruckSchedule[
       frequencyWeeks: d.frequency === "monthly_weeks" ? d.frequencyWeeks : null,
     }));
     startTransition(async () => {
-      const res = await publishTourAction(payload);
+      const res = await publishTourAction(truckId, payload);
       if (res.error) toast(res.error, "error");
       else toast("Tour published");
     });

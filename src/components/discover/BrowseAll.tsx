@@ -34,7 +34,7 @@ interface BrowseAllProps {
   entries: DiscoverEntry[];
   signedIn: boolean;
   favoritedSet: Set<string>;
-  ownTruckId: string | null;
+  ownTruckIds: Set<string>;
   userLocation: [number, number] | null;
   geoStatus: GeoStatus;
   onRequestLocation: () => void;
@@ -45,7 +45,7 @@ export default function BrowseAll({
   entries,
   signedIn,
   favoritedSet,
-  ownTruckId,
+  ownTruckIds,
   userLocation,
   geoStatus,
   onRequestLocation,
@@ -264,7 +264,7 @@ export default function BrowseAll({
                 signedIn={signedIn}
                 favorited={favoritedSet.has(entry.truck.id)}
                 distanceKm={hasLocation ? dist : null}
-                isOwnerView={ownTruckId === entry.truck.id}
+                isOwnerView={ownTruckIds.has(entry.truck.id)}
                 onSelect={() => onSelect(entry.truck.id)}
               />
             ))}

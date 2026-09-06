@@ -1,32 +1,43 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { DASH_TRUCK_COOKIE } from "@/lib/dashboardTruck";
 import { normalizeMenuItems, type MenuItem } from "@/lib/menu";
 import { geocode } from "@/lib/geocode";
 import { getMondayFirstDay } from "@/lib/geo";
 import { DEFAULT_MAP_CENTER } from "@/lib/cities";
 import { PHOTO_BUCKET, storagePathFromPublicUrl } from "@/lib/storage";
-import { notifyEventInvitation, notifyFollowerTruckLive } from "@/lib/email";
+import {
+  notifyEventInvitation,
+  notifyFollowerTruckLive,
+  notifyTruckJoined,
+} from "@/lib/email";
 import { normalizeEventType, type EventType, type ScheduleFrequency } from "@/lib/types";
 
-async function requireOwnTruckId(): Promise<string> {
+/** Verify the current user owns `truckId` (via `truck_owners`, migration 0014)
+ *  and return it. Every dashboard mutation is scoped to the truck the switcher
+ *  currently has selected — the id is passed from the client and checked here
+ *  (and again by RLS), so a tampered id just fails. */
+async function requireOwnedTruckId(truckId: string | null | undefined): Promise<string> {
+  if (!truckId) throw new Error("No truck selected");
   const supabase = createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("truck_id, role")
-    .eq("id", user.id)
+  const { data: link } = await supabase
+    .from("truck_owners")
+    .select("truck_id")
+    .eq("user_id", user.id)
+    .eq("truck_id", truckId)
     .maybeSingle();
 
-  if (!profile || profile.role !== "truck_owner" || !profile.truck_id) {
-    throw new Error("No truck linked to this account");
-  }
-  return profile.truck_id;
+  if (!link) throw new Error("You don't manage this truck");
+  return truckId;
 }
 
 export interface ActionResult {
@@ -45,10 +56,11 @@ function revalidateEverywhere() {
  * ------------------------------------------------------------------ */
 
 export async function saveSettingsAction(
+  truckId: string,
   _prev: ActionResult,
   formData: FormData
 ): Promise<ActionResult> {
-  const truckId = await requireOwnTruckId();
+  await requireOwnedTruckId(truckId);
   const supabase = createClient();
 
   const name = String(formData.get("name") ?? "").trim();
@@ -91,8 +103,8 @@ export async function saveSettingsAction(
  * MENU  (inline editor -> trucks.menu_items jsonb)
  * ------------------------------------------------------------------ */
 
-export async function saveMenuAction(items: unknown): Promise<ActionResult> {
-  const truckId = await requireOwnTruckId();
+export async function saveMenuAction(truckId: string, items: unknown): Promise<ActionResult> {
+  await requireOwnedTruckId(truckId);
   const supabase = createClient();
 
   const menuItems: MenuItem[] = normalizeMenuItems(items);
@@ -137,8 +149,11 @@ function clampTime(raw: string, fallback: string): string {
   return `${String(h).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
-export async function publishTourAction(days: TourDayInput[]): Promise<ActionResult> {
-  const truckId = await requireOwnTruckId();
+export async function publishTourAction(
+  truckId: string,
+  days: TourDayInput[]
+): Promise<ActionResult> {
+  await requireOwnedTruckId(truckId);
   const supabase = createClient();
 
   const rows: {
@@ -284,8 +299,8 @@ async function notifyFollowersOfBoost(
   }
 }
 
-export async function boostAction(input: BoostInput): Promise<ActionResult> {
-  const truckId = await requireOwnTruckId();
+export async function boostAction(truckId: string, input: BoostInput): Promise<ActionResult> {
+  await requireOwnedTruckId(truckId);
   const supabase = createClient();
 
   const now = new Date();
@@ -345,8 +360,8 @@ export async function boostAction(input: BoostInput): Promise<ActionResult> {
   return { success: true };
 }
 
-export async function endBoostAction(): Promise<ActionResult> {
-  const truckId = await requireOwnTruckId();
+export async function endBoostAction(truckId: string): Promise<ActionResult> {
+  await requireOwnedTruckId(truckId);
   const supabase = createClient();
 
   const { error } = await supabase
@@ -369,8 +384,12 @@ export async function endBoostAction(): Promise<ActionResult> {
  * REVIEWS
  * ------------------------------------------------------------------ */
 
-export async function replyToReviewAction(reviewId: string, reply: string): Promise<ActionResult> {
-  const truckId = await requireOwnTruckId();
+export async function replyToReviewAction(
+  truckId: string,
+  reviewId: string,
+  reply: string
+): Promise<ActionResult> {
+  await requireOwnedTruckId(truckId);
   const supabase = createClient();
 
   const { error } = await supabase
@@ -407,8 +426,8 @@ async function syncCoverPhoto(supabase: SupabaseServer, truckId: string) {
     .eq("id", truckId);
 }
 
-export async function addOwnPhotoAction(url: string, caption: string) {
-  const truckId = await requireOwnTruckId();
+export async function addOwnPhotoAction(truckId: string, url: string, caption: string) {
+  await requireOwnedTruckId(truckId);
   const supabase = createClient();
 
   const { count } = await supabase
@@ -427,8 +446,8 @@ export async function addOwnPhotoAction(url: string, caption: string) {
   revalidateEverywhere();
 }
 
-export async function deleteOwnPhotoAction(photoId: string) {
-  const truckId = await requireOwnTruckId();
+export async function deleteOwnPhotoAction(truckId: string, photoId: string) {
+  await requireOwnedTruckId(truckId);
   const supabase = createClient();
 
   const { data: row } = await supabase
@@ -449,8 +468,8 @@ export async function deleteOwnPhotoAction(photoId: string) {
   revalidateEverywhere();
 }
 
-export async function reorderOwnPhotosAction(orderedIds: string[]) {
-  const truckId = await requireOwnTruckId();
+export async function reorderOwnPhotosAction(truckId: string, orderedIds: string[]) {
+  await requireOwnedTruckId(truckId);
   const supabase = createClient();
 
   await Promise.all(
@@ -564,10 +583,11 @@ async function reconcileInvites(
 }
 
 export async function saveOwnEventAction(
+  truckId: string,
   eventId: string | null,
   input: EventInput
 ): Promise<ActionResult> {
-  const truckId = await requireOwnTruckId();
+  await requireOwnedTruckId(truckId);
   const supabase = createClient();
 
   const name = input.name.trim();
@@ -646,8 +666,11 @@ export async function saveOwnEventAction(
   return { success: true };
 }
 
-export async function deleteOwnEventAction(eventId: string): Promise<ActionResult> {
-  const truckId = await requireOwnTruckId();
+export async function deleteOwnEventAction(
+  truckId: string,
+  eventId: string
+): Promise<ActionResult> {
+  await requireOwnedTruckId(truckId);
   const supabase = createClient();
 
   const { error } = await supabase
@@ -663,10 +686,11 @@ export async function deleteOwnEventAction(eventId: string): Promise<ActionResul
 
 /** An invited truck accepts or declines a collaboration invitation. */
 export async function respondToEventInviteAction(
+  truckId: string,
   eventId: string,
   response: "confirmed" | "declined"
 ): Promise<ActionResult> {
-  const truckId = await requireOwnTruckId();
+  await requireOwnedTruckId(truckId);
   const supabase = createClient();
 
   const { error } = await supabase
@@ -688,8 +712,11 @@ export interface TruckSearchResult {
 
 /** Name search over public trucks for the "invite a truck" picker. Excludes the
  *  caller's own truck. */
-export async function searchTrucksAction(query: string): Promise<TruckSearchResult[]> {
-  const truckId = await requireOwnTruckId();
+export async function searchTrucksAction(
+  truckId: string,
+  query: string
+): Promise<TruckSearchResult[]> {
+  await requireOwnedTruckId(truckId);
   const supabase = createClient();
 
   const q = query.trim();
@@ -706,8 +733,8 @@ export async function searchTrucksAction(query: string): Promise<TruckSearchResu
 }
 
 /** Move one photo to the front (sort_order 0) — used by "Set as cover". */
-export async function setCoverOwnPhotoAction(photoId: string) {
-  const truckId = await requireOwnTruckId();
+export async function setCoverOwnPhotoAction(truckId: string, photoId: string) {
+  await requireOwnedTruckId(truckId);
   const supabase = createClient();
 
   const { data: rows } = await supabase
@@ -731,4 +758,91 @@ export async function setCoverOwnPhotoAction(photoId: string) {
 
   await syncCoverPhoto(supabase, truckId);
   revalidateEverywhere();
+}
+
+/* ------------------------------------------------------------------ *
+ * TRUCK SWITCHER  (multi-truck per account, migration 0014)
+ * ------------------------------------------------------------------ */
+
+/** Remember which of the owner's trucks the dashboard is managing. Set by the
+ *  switcher before it navigates, and read by the dashboard page + every action
+ *  fallback. Verified against `truck_owners` so a stale/tampered cookie is
+ *  ignored. */
+export async function selectTruckAction(truckId: string): Promise<ActionResult> {
+  await requireOwnedTruckId(truckId);
+  cookies().set(DASH_TRUCK_COOKIE, truckId, {
+    httpOnly: false,
+    sameSite: "lax",
+    path: "/dashboard",
+    maxAge: 60 * 60 * 24 * 365,
+  });
+  revalidatePath("/dashboard");
+  return { success: true };
+}
+
+/** Add another truck to the signed-in owner's account — claims an existing
+ *  unclaimed listing with this exact name, or creates a new one. Reuses
+ *  `register_truck_owner` (migration 0014 dropped its single-truck guard), so a
+ *  logged-in owner never needs a second email/account. */
+export async function addTruckAction(
+  _prev: ActionResult,
+  formData: FormData
+): Promise<ActionResult> {
+  const name = String(formData.get("truck_name") ?? "").trim();
+  if (!name) return { error: "Truck name is required." };
+
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Not signed in." };
+
+  const { data: existing } = await supabase
+    .from("public_trucks")
+    .select("id")
+    .ilike("name", name.replace(/[%_\\]/g, "\\$&"))
+    .eq("claim_status", "unclaimed")
+    .limit(1)
+    .maybeSingle();
+  const isClaim = Boolean(existing);
+
+  const { data: newTruckId, error } = await supabase.rpc("register_truck_owner", {
+    p_truck_name: name,
+    p_display_name: name,
+  });
+  if (error) return { error: error.message };
+
+  // Non-blocking owner notification.
+  try {
+    let slug: string | null = null;
+    if (newTruckId) {
+      const { data: t } = await supabase
+        .from("public_trucks")
+        .select("slug")
+        .eq("id", newTruckId)
+        .maybeSingle();
+      slug = t?.slug ?? null;
+    }
+    await notifyTruckJoined({
+      kind: isClaim ? "claim" : "registration",
+      truckName: name,
+      slug,
+      ownerName: name,
+      ownerEmail: user.email ?? null,
+    });
+  } catch (err) {
+    console.error("[add-truck] notification failed:", err);
+  }
+
+  if (newTruckId) {
+    cookies().set(DASH_TRUCK_COOKIE, newTruckId as string, {
+      httpOnly: false,
+      sameSite: "lax",
+      path: "/dashboard",
+      maxAge: 60 * 60 * 24 * 365,
+    });
+  }
+  revalidatePath("/dashboard");
+  revalidatePath("/", "layout");
+  redirect(newTruckId ? `/dashboard?truck=${newTruckId}` : "/dashboard");
 }

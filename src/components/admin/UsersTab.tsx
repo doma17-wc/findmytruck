@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { AdminUser } from "./AdminApp";
-import { deleteUserAction } from "@/app/admin/actions";
+import { deleteUserAction, adminUnlinkOneTruckAction } from "@/app/admin/actions";
 import { cn, Card, Badge, ActionButton } from "./ui";
 
 type RoleFilter = "all" | "customer" | "truck_owner";
@@ -25,7 +25,9 @@ export default function UsersTab({
       const r = u.role === "truck_owner" ? "truck_owner" : "customer";
       if (role !== "all" && r !== role) return false;
       if (needle) {
-        const hay = `${u.email ?? ""} ${u.display_name ?? ""} ${u.truck_name ?? ""}`.toLowerCase();
+        const hay = `${u.email ?? ""} ${u.display_name ?? ""} ${u.trucks
+          .map((t) => t.name)
+          .join(" ")}`.toLowerCase();
         if (!hay.includes(needle)) return false;
       }
       return true;
@@ -92,16 +94,36 @@ export default function UsersTab({
               )}
             </div>
             <p className="mt-1 text-sm text-muted">
-              {u.display_name ? `${u.display_name} · ` : ""}
-              {u.truck_id ? (
-                <Link href={`/admin/trucks/${u.truck_id}`} className="text-blue hover:underline">
-                  {u.truck_name ?? "linked truck"}
-                </Link>
-              ) : (
-                "no linked truck"
-              )}
+              {u.display_name ? u.display_name : "No display name"}
             </p>
-            <p className="mt-0.5 text-xs text-muted">
+
+            {u.trucks.length > 0 ? (
+              <ul className="mt-2 space-y-1.5">
+                {u.trucks.map((t) => (
+                  <li key={t.id} className="flex flex-wrap items-center gap-2 text-sm">
+                    <Link
+                      href={`/admin/trucks/${t.id}`}
+                      className="font-medium text-blue hover:underline"
+                    >
+                      {t.name}
+                    </Link>
+                    {t.claim_status === "pending" && <Badge tone="amber">Pending</Badge>}
+                    {t.claim_status === "claimed" && <Badge tone="blue">Claimed</Badge>}
+                    <ActionButton
+                      onRun={() => adminUnlinkOneTruckAction(u.id, t.id)}
+                      confirm={`Unassign "${t.name}" from ${u.email ?? "this account"}? Their other trucks are unaffected.`}
+                      className="ml-auto bg-paper-deep text-ink-soft hover:bg-line"
+                    >
+                      Unassign
+                    </ActionButton>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-1 text-xs text-muted">No trucks linked</p>
+            )}
+
+            <p className="mt-2 text-xs text-muted">
               Joined {fmt(u.created_at)} · last sign-in {fmt(u.last_sign_in_at)}
             </p>
 
@@ -109,7 +131,9 @@ export default function UsersTab({
               <ActionButton
                 onRun={() => deleteUserAction(u.id)}
                 confirm={`Delete the account ${u.email ?? u.id}? This frees up the email for re-registration${
-                  u.truck_id ? ' and resets their truck to "unclaimed"' : ""
+                  u.trucks.length > 0
+                    ? ` and resets ${u.trucks.length === 1 ? "their truck" : `all ${u.trucks.length} of their trucks`} to "unclaimed"`
+                    : ""
                 }. This cannot be undone.`}
                 className="bg-accent/10 text-accent-dark hover:bg-accent/20"
               >

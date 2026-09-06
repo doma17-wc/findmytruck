@@ -1,9 +1,11 @@
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
+import { getCurrentUserProfile, getOwnedTrucks, createClient } from "@/lib/supabase/server";
 import type { Truck, TruckSchedule, TruckPhoto, Review } from "@/lib/types";
 import { normalizeMenuItems } from "@/lib/menu";
 import { getMondayFirstDay, readBoost, isBoostActive } from "@/lib/geo";
 import { getDashboardEvents } from "@/lib/events";
+import { DASH_TRUCK_COOKIE, resolveSelectedTruck } from "@/lib/dashboardTruck";
 import DashboardApp, { type DashboardStats } from "@/components/dashboard/DashboardApp";
 
 export const metadata = { title: "Dashboard" };
@@ -20,14 +22,27 @@ function dateStr(d: Date): string {
   ).padStart(2, "0")}`;
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: { truck?: string };
+}) {
   const auth = await getCurrentUserProfile();
   if (!auth) redirect("/login?next=/dashboard");
-  if (auth.profile?.role !== "truck_owner" || !auth.profile.truck_id) {
+
+  const ownedTrucks = await getOwnedTrucks();
+  if (ownedTrucks.length === 0) {
+    // No trucks linked to this account yet.
     redirect("/register-truck");
   }
 
-  const truckId = auth.profile.truck_id;
+  const selected = resolveSelectedTruck(ownedTrucks, {
+    paramTruckId: searchParams.truck,
+    cookieTruckId: cookies().get(DASH_TRUCK_COOKIE)?.value,
+    defaultTruckId: auth.profile?.truck_id,
+  });
+  const truckId = (selected ?? ownedTrucks[0]).id;
+
   const supabase = createClient();
   const now = new Date();
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -67,7 +82,7 @@ export default async function DashboardPage() {
     getDashboardEvents(truckId),
   ]);
 
-  if (!truck) redirect("/register-truck");
+  if (!truck) redirect("/dashboard");
 
   const views = (viewRows ?? []) as { viewed_at: string }[];
   const favs = (favRows ?? []) as { created_at: string }[];
@@ -172,6 +187,7 @@ export default async function DashboardPage() {
   return (
     <DashboardApp
       truck={truck as Truck}
+      ownedTrucks={ownedTrucks}
       schedules={(schedules ?? []) as TruckSchedule[]}
       photos={(photos ?? []) as TruckPhoto[]}
       reviews={reviewList}
@@ -180,7 +196,7 @@ export default async function DashboardPage() {
       boostExpiresAt={boost.expiresAt ? boost.expiresAt.toISOString() : null}
       boostStartedAt={boost.startedAt ? boost.startedAt.toISOString() : null}
       stats={stats}
-      ownerName={auth.profile.display_name ?? null}
+      ownerName={auth.profile?.display_name ?? null}
     />
   );
 }

@@ -111,9 +111,20 @@ function SaveBar() {
   );
 }
 
-export default function SettingsPanel({ truck, photos }: { truck: Truck; photos: TruckPhoto[] }) {
+export default function SettingsPanel({
+  truckId,
+  truck,
+  photos,
+}: {
+  truckId: string;
+  truck: Truck;
+  photos: TruckPhoto[];
+}) {
   const toast = useToast();
-  const [state, formAction] = useFormState<ActionResult, FormData>(saveSettingsAction, {});
+  const [state, formAction] = useFormState<ActionResult, FormData>(
+    saveSettingsAction.bind(null, truckId),
+    {}
+  );
 
   const [cuisine, setCuisine] = useState<string[]>(truck.cuisine_type ?? []);
   const [price, setPrice] = useState<string>(truck.price_range ?? "");
@@ -230,10 +241,10 @@ export default function SettingsPanel({ truck, photos }: { truck: Truck; photos:
             photos={photos}
             uploadToStorage={uploadGalleryPhoto}
             removeFromStorage={removeGalleryPhotoFromStorage}
-            onAdd={(url) => addOwnPhotoAction(url, "")}
-            onDelete={(id) => deleteOwnPhotoAction(id)}
-            onReorder={(ids) => reorderOwnPhotosAction(ids)}
-            onSetCover={(id) => setCoverOwnPhotoAction(id)}
+            onAdd={(url) => addOwnPhotoAction(truckId, url, "")}
+            onDelete={(id) => deleteOwnPhotoAction(truckId, id)}
+            onReorder={(ids) => reorderOwnPhotosAction(truckId, ids)}
+            onSetCover={(id) => setCoverOwnPhotoAction(truckId, id)}
           />
         </div>
       </Section>

@@ -22,7 +22,7 @@ function Stars({ rating }: { rating: number }) {
   );
 }
 
-function ReviewCard({ review }: { review: Review }) {
+function ReviewCard({ truckId, review }: { truckId: string; review: Review }) {
   const toast = useToast();
   const [pending, startTransition] = useTransition();
   const [editing, setEditing] = useState(false);
@@ -30,7 +30,7 @@ function ReviewCard({ review }: { review: Review }) {
 
   const save = () => {
     startTransition(async () => {
-      const res = await replyToReviewAction(review.id, reply);
+      const res = await replyToReviewAction(truckId, review.id, reply);
       if (res.error) toast(res.error, "error");
       else {
         toast("Reply posted");
@@ -132,7 +132,13 @@ function ReviewCard({ review }: { review: Review }) {
   );
 }
 
-export default function ReviewsPanel({ reviews }: { reviews: Review[] }) {
+export default function ReviewsPanel({
+  truckId,
+  reviews,
+}: {
+  truckId: string;
+  reviews: Review[];
+}) {
   if (reviews.length === 0) {
     return (
       <Card>
@@ -165,7 +171,7 @@ export default function ReviewsPanel({ reviews }: { reviews: Review[] }) {
         </CardBody>
       </Card>
       {reviews.map((r) => (
-        <ReviewCard key={r.id} review={r} />
+        <ReviewCard key={r.id} truckId={truckId} review={r} />
       ))}
     </div>
   );

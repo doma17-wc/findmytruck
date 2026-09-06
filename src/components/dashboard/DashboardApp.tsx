@@ -13,10 +13,11 @@ import {
   Settings as SettingsIcon,
   Menu as MenuIcon,
   X,
-  ExternalLink,
 } from "lucide-react";
 import type { Truck, TruckSchedule, TruckPhoto, Review, DashboardEvent } from "@/lib/types";
+import type { OwnedTruckLite } from "@/lib/dashboardTruck";
 import { ToastProvider, Beacon, cn } from "./ui";
+import TruckSwitcher from "./TruckSwitcher";
 import OverviewPanel from "./panels/OverviewPanel";
 import BoostPanel from "./panels/BoostPanel";
 import MenuPanel from "./panels/MenuPanel";
@@ -44,6 +45,7 @@ export interface DashboardStats {
 
 interface Props {
   truck: Truck;
+  ownedTrucks: OwnedTruckLite[];
   schedules: TruckSchedule[];
   photos: TruckPhoto[];
   reviews: Review[];
@@ -116,22 +118,17 @@ export default function DashboardApp(props: Props) {
         </button>
       </div>
 
-      <div className="rounded-xl bg-white/5 p-3">
-        <div className="flex items-center gap-2">
-          <Beacon live={boosted} />
-          <span className="truncate text-sm font-semibold">{truck.name}</span>
-        </div>
-        <p className="mt-1 text-xs text-white/50">
-          {boosted ? "Boosted now" : truck.is_active ? "Listed · not boosted" : "Not listed"}
-        </p>
-        <Link
-          href={`/trucks/${truck.slug}`}
-          target="_blank"
-          className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-white/60 transition hover:text-white"
-        >
-          View public profile <ExternalLink className="h-3 w-3" />
-        </Link>
-      </div>
+      <TruckSwitcher
+        current={{
+          id: truck.id,
+          name: truck.name,
+          slug: truck.slug,
+          claim_status: truck.claim_status ?? null,
+        }}
+        owned={props.ownedTrucks}
+        boosted={boosted}
+        isActive={truck.is_active}
+      />
 
       <nav className="flex flex-1 flex-col gap-1">
         {NAV.map(({ key, label, icon: Icon }) => (
@@ -226,21 +223,24 @@ export default function DashboardApp(props: Props) {
               {active === "overview" && (
                 <OverviewPanel {...props} onNavigate={go} />
               )}
-              {active === "boost" && <BoostPanel {...props} />}
-              {active === "menu" && <MenuPanel truck={truck} />}
-              {active === "schedule" && <SchedulePanel schedules={props.schedules} />}
+              {active === "boost" && <BoostPanel {...props} truckId={truck.id} />}
+              {active === "menu" && <MenuPanel truckId={truck.id} truck={truck} />}
+              {active === "schedule" && (
+                <SchedulePanel truckId={truck.id} schedules={props.schedules} />
+              )}
               {active === "events" && (
                 <EventsPanel
+                  truckId={truck.id}
                   truckName={truck.name}
                   hosting={props.events.hosting}
                   attending={props.events.attending}
                   invitations={props.events.invitations}
                 />
               )}
-              {active === "reviews" && <ReviewsPanel reviews={props.reviews} />}
+              {active === "reviews" && <ReviewsPanel truckId={truck.id} reviews={props.reviews} />}
               {active === "insights" && <InsightsPanel stats={props.stats} />}
               {active === "settings" && (
-                <SettingsPanel truck={truck} photos={props.photos} />
+                <SettingsPanel truckId={truck.id} truck={truck} photos={props.photos} />
               )}
             </div>
           </main>

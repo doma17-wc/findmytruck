@@ -274,6 +274,23 @@ export async function unassignOwnerAction(truckId: string) {
   return { success: true };
 }
 
+/** Unassign ONE truck from ONE owner, leaving that owner's other trucks (and any
+ *  other owners of this truck) untouched. Migration 0014. */
+export async function adminUnlinkOneTruckAction(userId: string, truckId: string) {
+  const service = getServiceSupabase();
+  if (!service) {
+    return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to manage owner accounts." };
+  }
+  const { error } = await service.rpc("admin_unlink_one_truck_owner", {
+    p_user_id: userId,
+    p_truck_id: truckId,
+  });
+  if (error) return { error: error.message };
+  revalidatePath("/admin");
+  revalidatePublic();
+  return { success: true };
+}
+
 // ---------- Users ----------
 
 export async function deleteUserAction(userId: string) {
@@ -282,15 +299,17 @@ export async function deleteUserAction(userId: string) {
     return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to delete user accounts." };
   }
 
-  // If this user owns a truck, release it back to "unclaimed" so the profile
-  // isn't the only thing standing between the truck and a future claim.
-  const { data: profile } = await service
-    .from("profiles")
-    .select("truck_id, role")
-    .eq("id", userId)
-    .maybeSingle();
-  if (profile?.truck_id) {
-    await service.rpc("admin_unlink_truck_owner", { p_truck_id: profile.truck_id });
+  // Release every truck this user owns back to "unclaimed" (multi-truck per
+  // account, migration 0014) so no truck is left orphaned behind a dead account.
+  const { data: ownedLinks } = await service
+    .from("truck_owners")
+    .select("truck_id")
+    .eq("user_id", userId);
+  for (const link of (ownedLinks ?? []) as { truck_id: string }[]) {
+    await service.rpc("admin_unlink_one_truck_owner", {
+      p_user_id: userId,
+      p_truck_id: link.truck_id,
+    });
   }
 
   const { error } = await service.auth.admin.deleteUser(userId);

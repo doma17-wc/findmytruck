@@ -95,7 +95,7 @@ export default async function TruckProfilePage({ params }: PageProps) {
     isFavorited = Boolean(data);
   }
 
-  const isOwnerView = auth?.profile?.truck_id === truck.id;
+  const isOwnerView = (auth?.ownedTruckIds ?? []).includes(truck.id);
   const menuItems = normalizeMenuItems(truck.menu_items);
   const unclaimed = isUnclaimed(truck);
   const websiteUrl = truck.website ?? truck.source_website ?? null;

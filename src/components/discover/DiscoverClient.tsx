@@ -54,7 +54,7 @@ interface DiscoverClientProps {
   ratings: Record<string, TruckRating>;
   eventsByTruck?: Record<string, EventWithTrucks[]>;
   allEvents?: EventWithTrucks[];
-  auth: { email: string; profile: AppProfile | null } | null;
+  auth: { email: string; profile: AppProfile | null; ownedTruckIds?: string[] } | null;
   favoritedIds: string[];
   reviewsRequireLogin?: boolean;
 }
@@ -80,7 +80,7 @@ function DiscoverClientInner({
   const router = useRouter();
   const signedIn = Boolean(auth);
   const favoritedSet = useMemo(() => new Set(favoritedIds), [favoritedIds]);
-  const ownTruckId = auth?.profile?.role === "truck_owner" ? auth.profile.truck_id : null;
+  const ownedTruckIds = new Set(auth?.ownedTruckIds ?? []);
 
   const [now, setNow] = useState(() => new Date());
   const {
@@ -443,7 +443,7 @@ function DiscoverClientInner({
                     favorited={favoritedSet.has(entry.truck.id)}
                     selected={selectedId === entry.truck.id}
                     distanceKm={userLocation ? dist : null}
-                    isOwnerView={ownTruckId === entry.truck.id}
+                    isOwnerView={ownedTruckIds.has(entry.truck.id)}
                     onSelect={() => setSelectedId(entry.truck.id)}
                     onHover={(h) => setHoveredId(h ? entry.truck.id : null)}
                     ref={(el) => {
@@ -509,7 +509,7 @@ function DiscoverClientInner({
         entries={liveEntries}
         signedIn={signedIn}
         favoritedSet={favoritedSet}
-        ownTruckId={ownTruckId}
+        ownTruckIds={ownedTruckIds}
         userLocation={userLocation}
         geoStatus={geoStatus}
         onRequestLocation={requestLocation}
@@ -522,7 +522,7 @@ function DiscoverClientInner({
           now={now}
           signedIn={signedIn}
           favorited={favoritedSet.has(selectedEntry.truck.id)}
-          isOwnerView={ownTruckId === selectedEntry.truck.id}
+          isOwnerView={ownedTruckIds.has(selectedEntry.truck.id)}
           reviewsRequireLogin={reviewsRequireLogin}
           onClose={() => setSelectedId(null)}
         />

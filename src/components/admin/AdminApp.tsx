@@ -25,9 +25,9 @@ export interface AdminUser {
   created_at: string;
   last_sign_in_at: string | null;
   role: "customer" | "truck_owner" | null;
-  truck_id: string | null;
-  truck_name: string | null;
   display_name: string | null;
+  /** Every truck this account owns (migration 0014 — multi-truck per account). */
+  trucks: { id: string; name: string; claim_status: string | null }[];
 }
 
 type Tab = "overview" | "trucks" | "claims" | "events" | "users" | "settings";

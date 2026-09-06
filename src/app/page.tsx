@@ -35,7 +35,15 @@ export default async function HomePage() {
       ratings={ratings}
       eventsByTruck={eventsByTruck}
       allEvents={allEvents}
-      auth={auth ? { email: auth.user.email ?? "", profile: auth.profile } : null}
+      auth={
+        auth
+          ? {
+              email: auth.user.email ?? "",
+              profile: auth.profile,
+              ownedTruckIds: auth.ownedTruckIds,
+            }
+          : null
+      }
       favoritedIds={favoritedIds}
       reviewsRequireLogin={reviewsRequireLogin}
     />

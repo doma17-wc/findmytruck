@@ -8,6 +8,7 @@ import BoostHero from "../BoostHero";
 import { boostAction, endBoostAction } from "@/app/dashboard/actions";
 
 interface Props {
+  truckId: string;
   truck: Truck;
   schedules: TruckSchedule[];
   boosted: boolean;
@@ -18,6 +19,7 @@ interface Props {
 const CURRENT = "__current__";
 
 export default function BoostPanel({
+  truckId,
   schedules,
   boosted,
   boostExpiresAt,
@@ -78,7 +80,7 @@ export default function BoostPanel({
       return;
     }
     startTransition(async () => {
-      const res = await boostAction({
+      const res = await boostAction(truckId, {
         lat: loc.lat,
         lng: loc.lng,
         locationName: activePitch?.location_name ?? null,
@@ -90,7 +92,7 @@ export default function BoostPanel({
 
   const handleEnd = () => {
     startTransition(async () => {
-      const res = await endBoostAction();
+      const res = await endBoostAction(truckId);
       if (res.error) toast(res.error, "error");
       else toast("Boost ended");
     });

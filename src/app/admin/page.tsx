@@ -86,10 +86,11 @@ export default async function AdminDashboardPage() {
   // ---- Users (needs the service-role key) ----
   let users: AdminUser[] | null = null;
   if (service) {
-    const truckName = new Map(trucks.map((t) => [t.id, t.name]));
-    const [{ data: authData }, { data: profiles }] = await Promise.all([
+    const truckById = new Map(trucks.map((t) => [t.id, t]));
+    const [{ data: authData }, { data: profiles }, { data: ownerLinks }] = await Promise.all([
       service.auth.admin.listUsers({ perPage: 1000 }),
       service.from("profiles").select("id, role, truck_id, display_name"),
+      service.from("truck_owners").select("user_id, truck_id, created_at"),
     ]);
     const profileById = new Map(
       ((profiles ?? []) as {
@@ -99,17 +100,30 @@ export default async function AdminDashboardPage() {
         display_name: string | null;
       }[]).map((p) => [p.id, p])
     );
+
+    // All trucks each user owns (migration 0014), oldest link first.
+    const trucksByUser = new Map<string, { id: string; name: string; claim_status: string | null }[]>();
+    ((ownerLinks ?? []) as { user_id: string; truck_id: string; created_at: string }[])
+      .sort((a, b) => (a.created_at < b.created_at ? -1 : 1))
+      .forEach((l) => {
+        const t = truckById.get(l.truck_id);
+        if (!t) return;
+        const list = trucksByUser.get(l.user_id) ?? [];
+        list.push({ id: t.id, name: t.name, claim_status: t.claim_status ?? null });
+        trucksByUser.set(l.user_id, list);
+      });
+
     users = (authData?.users ?? []).map((u) => {
       const p = profileById.get(u.id);
+      const owned = trucksByUser.get(u.id) ?? [];
       return {
         id: u.id,
         email: u.email ?? null,
         created_at: u.created_at,
         last_sign_in_at: u.last_sign_in_at ?? null,
         role: p?.role ?? null,
-        truck_id: p?.truck_id ?? null,
-        truck_name: p?.truck_id ? truckName.get(p.truck_id) ?? null : null,
         display_name: p?.display_name ?? null,
+        trucks: owned,
       };
     });
     users.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));

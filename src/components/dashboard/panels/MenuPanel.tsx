@@ -49,7 +49,7 @@ function serialize(items: EditItem[]): MenuItem[] {
   );
 }
 
-export default function MenuPanel({ truck }: { truck: Truck }) {
+export default function MenuPanel({ truckId, truck }: { truckId: string; truck: Truck }) {
   const toast = useToast();
   const initial = useMemo(() => normalizeMenuItems(truck.menu_items), [truck.menu_items]);
 
@@ -76,7 +76,7 @@ export default function MenuPanel({ truck }: { truck: Truck }) {
     if (payload === lastSaved.current) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(async () => {
-      const res = await saveMenuAction(serialize(items));
+      const res = await saveMenuAction(truckId, serialize(items));
       if (res.error) toast(res.error, "error");
       else {
         lastSaved.current = payload;
