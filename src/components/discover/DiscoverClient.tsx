@@ -2,23 +2,32 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
+  CalendarDays,
   ChevronDown,
   List,
   LocateFixed,
   Map as MapIcon,
+  MapPin,
   Search,
   SlidersHorizontal,
 } from "lucide-react";
 import type { TruckWithSchedules } from "@/lib/data";
 import type { EventWithTrucks } from "@/lib/types";
+import { EVENT_TYPE_META, normalizeEventType } from "@/lib/types";
 import { distanceKm } from "@/lib/geo";
+import { dateStr } from "@/lib/events";
+import { formatEventDateRange, formatEventTime } from "@/lib/eventFormat";
+import { LangProvider, useLang, weekdayName, type Lang } from "@/lib/i18n";
 import { CITY_LIST, DEFAULT_MAP_CENTER, CITIES } from "@/lib/cities";
 import DiscoverHeader from "./DiscoverHeader";
+import DaySelector from "./DaySelector";
 import TruckCard from "./TruckCard";
 import DetailSheet from "./DetailSheet";
 import BrowseAll from "./BrowseAll";
-import { buildEntries, CUISINE_CHIPS, matchesCuisine } from "./helpers";
+import { buildDayEntries, buildEntries, CUISINE_CHIPS, matchesCuisine } from "./helpers";
 import type { SortKey, TruckRating } from "./types";
 import type { TruckTier } from "@/lib/geo";
 import { useGeolocation } from "./useGeolocation";
@@ -44,19 +53,31 @@ interface DiscoverClientProps {
   initialTrucks: TruckWithSchedules[];
   ratings: Record<string, TruckRating>;
   eventsByTruck?: Record<string, EventWithTrucks[]>;
+  allEvents?: EventWithTrucks[];
   auth: { email: string; profile: AppProfile | null } | null;
   favoritedIds: string[];
   reviewsRequireLogin?: boolean;
 }
 
-export default function DiscoverClient({
+export default function DiscoverClient(props: DiscoverClientProps) {
+  return (
+    <LangProvider>
+      <DiscoverClientInner {...props} />
+    </LangProvider>
+  );
+}
+
+function DiscoverClientInner({
   initialTrucks,
   ratings,
   eventsByTruck = {},
+  allEvents = [],
   auth,
   favoritedIds,
   reviewsRequireLogin = false,
 }: DiscoverClientProps) {
+  const { lang, t } = useLang();
+  const router = useRouter();
   const signedIn = Boolean(auth);
   const favoritedSet = useMemo(() => new Set(favoritedIds), [favoritedIds]);
   const ownTruckId = auth?.profile?.role === "truck_owner" ? auth.profile.truck_id : null;
@@ -74,6 +95,9 @@ export default function DiscoverClient({
   const [openNowOnly, setOpenNowOnly] = useState(false);
   const [cuisines, setCuisines] = useState<Set<string>>(new Set());
   const [sort, setSort] = useState<SortKey>("distance");
+  /** null = "Today" (live view); a Date = plan that specific day. */
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const isToday = selectedDate == null;
 
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -94,9 +118,40 @@ export default function DiscoverClient({
     return () => clearInterval(id);
   }, []);
 
-  const allEntries = useMemo(
+  // Live (today) entries — always built; also feeds the "Browse all" directory
+  // below the fold, which stays a real-time view regardless of the day selector.
+  const liveEntries = useMemo(
     () => buildEntries(initialTrucks, ratings, now, eventsByTruck),
     [initialTrucks, ratings, now, eventsByTruck]
+  );
+
+  // Entries for the chosen planned day (map + list at the top).
+  const allEntries = useMemo(
+    () =>
+      isToday
+        ? liveEntries
+        : buildDayEntries(initialTrucks, ratings, selectedDate as Date, eventsByTruck),
+    [isToday, liveEntries, initialTrucks, ratings, selectedDate, eventsByTruck]
+  );
+
+  // Events to surface: today → the nearest upcoming ones; a planned day → the
+  // events actually happening on that date.
+  const viewEvents = useMemo(() => {
+    if (isToday) return allEvents.slice(0, 12);
+    const iso = dateStr(selectedDate as Date);
+    return allEvents.filter((e) => e.start_date <= iso && iso <= e.end_date);
+  }, [isToday, allEvents, selectedDate]);
+
+  const eventPins = useMemo(
+    () =>
+      isToday
+        ? []
+        : viewEvents.map((e) => ({
+            id: e.id,
+            name: e.name,
+            coord: [e.location_lng, e.location_lat] as [number, number],
+          })),
+    [isToday, viewEvents]
   );
 
   const cityCenter: [number, number] | null = citySlug
@@ -106,28 +161,23 @@ export default function DiscoverClient({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return allEntries.filter(({ truck, status }) => {
+    return allEntries.filter(({ truck, status, coord }) => {
       if (
         q &&
         !truck.name.toLowerCase().includes(q) &&
         !truck.cuisine_type.some((c) => c.toLowerCase().includes(q))
       )
         return false;
-      if (openNowOnly && status.tier === "closed") return false;
+      if (isToday && openNowOnly && status.tier === "closed") return false;
       if (cuisines.size > 0 && ![...cuisines].some((c) => matchesCuisine(truck.cuisine_type, c)))
         return false;
-      if (cityCenter && status.schedule) {
-        const d = distanceKm(
-          cityCenter[1],
-          cityCenter[0],
-          status.schedule.location_lat,
-          status.schedule.location_lng
-        );
+      if (cityCenter) {
+        const d = distanceKm(cityCenter[1], cityCenter[0], coord[1], coord[0]);
         if (d > 20) return false;
       }
       return true;
     });
-  }, [allEntries, query, openNowOnly, cuisines, cityCenter, now]);
+  }, [allEntries, query, isToday, openNowOnly, cuisines, cityCenter]);
 
   const sorted = useMemo(() => {
     const withDist = filtered.map((e) => ({
@@ -152,7 +202,9 @@ export default function DiscoverClient({
     return withDist;
   }, [filtered, referencePoint, sort]);
 
-  const boostedCount = allEntries.filter((e) => e.status.tier === "boosted").length;
+  const boostedCount = isToday
+    ? allEntries.filter((e) => e.status.tier === "boosted").length
+    : 0;
   const selectedEntry = selectedId
     ? allEntries.find((e) => e.truck.id === selectedId) ?? null
     : null;
@@ -168,6 +220,23 @@ export default function DiscoverClient({
   }, [selectedId]);
 
   const mapEntries = useMemo(() => sorted.map((s) => s.entry), [sorted]);
+
+  // "today" / "tomorrow" / "Thursday" for the list header + empty state.
+  // English "today/tomorrow" read better lowercased mid-sentence; German nouns
+  // stay capitalised.
+  const viewDayLabel = useMemo(() => {
+    const rel = (key: "today" | "tomorrow") =>
+      lang === "en" ? t(key).toLowerCase() : t(key);
+    if (!selectedDate) return rel("today");
+    const a = new Date();
+    a.setHours(0, 0, 0, 0);
+    const b = new Date(selectedDate);
+    b.setHours(0, 0, 0, 0);
+    const diff = Math.round((b.getTime() - a.getTime()) / 86_400_000);
+    if (diff === 0) return rel("today");
+    if (diff === 1) return rel("tomorrow");
+    return weekdayName(b, lang, "long");
+  }, [selectedDate, lang, t]);
 
   const scrollToBrowse = () => {
     document.getElementById("browse")?.scrollIntoView({ behavior: "smooth" });
@@ -187,6 +256,17 @@ export default function DiscoverClient({
       {/* ---------- Top: synced split-view discovery (one viewport tall) ---------- */}
       <div className="flex h-[100dvh] flex-col overflow-hidden">
         <DiscoverHeader auth={auth} />
+
+        {/* Value headline — reframes the page around planning, not just "now" */}
+        <div className="flex flex-shrink-0 items-center gap-2 border-b border-line bg-paper px-4 py-1.5">
+          <span className="text-base leading-none">🚚</span>
+          <p className="truncate text-[12.5px] font-semibold text-ink-soft sm:text-[13.5px]">
+            {t("headline")}
+          </p>
+        </div>
+
+        {/* Day selector — one control drives the map + list + events together */}
+        <DaySelector value={selectedDate} onChange={setSelectedDate} />
 
         {/* Search row */}
         <div className="flex flex-shrink-0 items-center gap-2 border-b border-line bg-paper px-4 py-2.5">
@@ -219,22 +299,24 @@ export default function DiscoverClient({
         {/* Filter row */}
         <div className="flex flex-shrink-0 items-center gap-2 border-b border-line bg-paper px-4 py-2">
           <div className="no-scrollbar flex flex-1 items-center gap-2 overflow-x-auto">
-            <button
-              type="button"
-              onClick={() => setOpenNowOnly((v) => !v)}
-              className={`flex flex-shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-bold transition ${
-                openNowOnly
-                  ? "border-green-500 bg-green-500 text-white"
-                  : "border-line bg-card text-ink-soft hover:border-green-400"
-              }`}
-            >
-              <span
-                className={`h-1.5 w-1.5 rounded-full ${
-                  openNowOnly ? "bg-white" : "bg-green-500"
+            {isToday && (
+              <button
+                type="button"
+                onClick={() => setOpenNowOnly((v) => !v)}
+                className={`flex flex-shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[13px] font-bold transition ${
+                  openNowOnly
+                    ? "border-green-500 bg-green-500 text-white"
+                    : "border-line bg-card text-ink-soft hover:border-green-400"
                 }`}
-              />
-              Open now
-            </button>
+              >
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    openNowOnly ? "bg-white" : "bg-green-500"
+                  }`}
+                />
+                Open now
+              </button>
+            )}
 
             <button
               type="button"
@@ -305,8 +387,12 @@ export default function DiscoverClient({
           >
             <div className="flex items-center justify-between px-4 pb-1 pt-3">
               <p className="font-display text-sm font-bold text-ink">
-                {sorted.length} truck{sorted.length === 1 ? "" : "s"}
-                {citySlug && ` near ${CITIES[citySlug]?.name}`}
+                {t("trucksOut", {
+                  n: sorted.length,
+                  s: sorted.length === 1 ? "" : "s",
+                  day: viewDayLabel,
+                })}
+                {citySlug && ` · ${CITIES[citySlug]?.name}`}
               </p>
               {boostedCount > 0 && (
                 <span className="inline-flex items-center gap-1.5 text-[12px] font-bold text-live">
@@ -318,6 +404,18 @@ export default function DiscoverClient({
                 </span>
               )}
             </div>
+
+            {!isToday && (
+              <p className="px-4 pb-1 text-[12px] text-muted">{t("liveOnlyToday")}</p>
+            )}
+
+            {viewEvents.length > 0 && (
+              <EventStrip
+                events={viewEvents}
+                title={isToday ? t("eventsUpcoming") : t("eventsOnDay", { day: viewDayLabel })}
+                lang={lang}
+              />
+            )}
 
             {locationDenied && (
               <button
@@ -332,7 +430,9 @@ export default function DiscoverClient({
             <div className="space-y-3 p-4">
               {sorted.length === 0 ? (
                 <p className="py-16 text-center text-sm text-muted">
-                  No trucks match your filters.
+                  {isToday || query || cuisines.size > 0 || citySlug
+                    ? t("noMatch")
+                    : t("noTrucksDay", { day: viewDayLabel })}
                 </p>
               ) : (
                 sorted.map(({ entry, dist }) => (
@@ -363,6 +463,7 @@ export default function DiscoverClient({
           >
             <DiscoverMap
               entries={mapEntries}
+              eventPins={eventPins}
               userLocation={userLocation}
               cityCenter={cityCenter}
               hoveredId={hoveredId}
@@ -370,6 +471,7 @@ export default function DiscoverClient({
               boostedCount={boostedCount}
               onHover={setHoveredId}
               onSelect={setSelectedId}
+              onSelectEvent={(id) => router.push(`/events/${id}`)}
               onRequestLocation={requestLocation}
             />
           </div>
@@ -402,9 +504,9 @@ export default function DiscoverClient({
         </div>
       </div>
 
-      {/* ---------- Below the fold: full browsable directory ---------- */}
+      {/* ---------- Below the fold: full browsable directory (always live) ---------- */}
       <BrowseAll
-        entries={allEntries}
+        entries={liveEntries}
         signedIn={signedIn}
         favoritedSet={favoritedSet}
         ownTruckId={ownTruckId}
@@ -425,6 +527,63 @@ export default function DiscoverClient({
           onClose={() => setSelectedId(null)}
         />
       )}
+    </div>
+  );
+}
+
+/** Compact horizontal strip of events, shown at the top of the discovery list. */
+function EventStrip({
+  events,
+  title,
+  lang,
+}: {
+  events: EventWithTrucks[];
+  title: string;
+  lang: Lang;
+}) {
+  return (
+    <div className="border-b border-line px-4 pb-3 pt-2">
+      <p className="mb-2 font-display text-[12px] font-bold uppercase tracking-wider text-muted">
+        {title}
+      </p>
+      <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
+        {events.map((e) => {
+          const meta = EVENT_TYPE_META[normalizeEventType(e.event_type)];
+          const time = formatEventTime(e.start_time, e.end_time);
+          const dateLabel =
+            e.start_date === e.end_date
+              ? weekdayName(new Date(`${e.start_date}T00:00:00`), lang, "short")
+              : formatEventDateRange(e.start_date, e.end_date);
+          return (
+            <Link
+              key={e.id}
+              href={`/events/${e.id}`}
+              className="flex w-[220px] flex-shrink-0 gap-2.5 rounded-xl border border-line bg-card p-2.5 shadow-paper transition hover:border-brand-200 hover:shadow-card-hover"
+            >
+              <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center overflow-hidden rounded-lg bg-brand-50 text-lg">
+                {e.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={e.image_url} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <span>{meta.emoji}</span>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[13px] font-bold leading-tight text-ink">{e.name}</p>
+                <p className="mt-0.5 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-brand-700">
+                  <CalendarDays className="h-3 w-3" />
+                  {dateLabel}
+                  {time && ` · ${time}`}
+                </p>
+                <p className="mt-0.5 flex items-center gap-1 truncate text-[11px] text-muted">
+                  <MapPin className="h-3 w-3 flex-shrink-0" />
+                  <span className="truncate">{e.location_name}</span>
+                </p>
+              </div>
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }

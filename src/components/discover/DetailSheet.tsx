@@ -23,12 +23,13 @@ import FavoriteButton from "@/components/FavoriteButton";
 import { normalizeMenuItems } from "@/lib/menu";
 import { DAY_LABELS_SHORT, type TruckPhoto } from "@/lib/types";
 import { formatTimeRange, getMondayFirstDay } from "@/lib/geo";
+import { useLang, weekdayName } from "@/lib/i18n";
 import { isUnclaimed } from "@/lib/unclaimed";
 import { createClient } from "@/lib/supabase/client";
 import { recordTruckView } from "@/lib/trackView";
 import ReviewsSection from "@/components/reviews/ReviewsSection";
 import type { DiscoverEntry } from "./types";
-import { RatingBadge } from "./Bits";
+import { NextUpLine, RatingBadge } from "./Bits";
 import { dietaryPills } from "./helpers";
 
 interface DetailSheetProps {
@@ -64,7 +65,8 @@ export default function DetailSheet({
   reviewsRequireLogin = false,
   onClose,
 }: DetailSheetProps) {
-  const { truck, status, schedules, rating, events } = entry;
+  const { truck, status, schedules, rating, events, dayPlan } = entry;
+  const { lang, t } = useLang();
   const unclaimed = isUnclaimed(truck);
   const menuItems = normalizeMenuItems(truck.menu_items);
   const pills = dietaryPills(truck.dietary_options ?? []);
@@ -72,12 +74,24 @@ export default function DetailSheet({
 
   const today = getMondayFirstDay(now);
   const activeSchedule = status.schedule;
-  const boosted = status.tier === "boosted";
+  const boosted = status.tier === "boosted" && !dayPlan;
   const available = status.tier !== "closed";
   const weekly = schedules.filter((s) => s.specific_date == null);
+  const planLocationName = dayPlan?.locationName ?? activeSchedule?.location_name ?? null;
+  const planRange = dayPlan
+    ? dayPlan.start && dayPlan.end
+      ? `${dayPlan.start}–${dayPlan.end}`
+      : dayPlan.start || ""
+    : null;
 
-  const directionsUrl = activeSchedule
-    ? `https://www.google.com/maps/dir/?api=1&destination=${activeSchedule.location_lat},${activeSchedule.location_lng}`
+  const destination =
+    dayPlan && (!activeSchedule)
+      ? `${entry.coord[1]},${entry.coord[0]}`
+      : activeSchedule
+      ? `${activeSchedule.location_lat},${activeSchedule.location_lng}`
+      : null;
+  const directionsUrl = destination
+    ? `https://www.google.com/maps/dir/?api=1&destination=${destination}`
     : undefined;
 
   const plate = truck.short_code ?? `FMT-${truck.slug.slice(0, 6).toUpperCase()}`;
@@ -356,28 +370,38 @@ export default function DetailSheet({
                     <span className="relative h-1.5 w-1.5 rounded-full bg-current" />
                   </span>
                 )}
-                {status.label}
+                {dayPlan
+                  ? `${weekdayName(dayPlan.date, lang, "short")}${
+                      planRange ? ` · ${planRange}` : ""
+                    }`
+                  : status.tier === "closed"
+                  ? t("planned")
+                  : status.label}
               </span>
-              {available && status.openUntil && (
+              {dayPlan && dayPlan.fromEvent && (
+                <span className="text-[13px] text-ink-soft">🎪</span>
+              )}
+              {!dayPlan && available && status.openUntil && (
                 <span className="text-[13px] text-ink-soft">
                   Serving until {status.openUntil}
                 </span>
               )}
-              {!available && status.detail && (
-                <span className="text-[13px] text-ink-soft">{status.detail}</span>
-              )}
             </div>
 
-            {boosted && (
+            {!dayPlan && boosted && (
               <p className="mt-1.5 text-[12px] font-semibold text-live">
                 ● {status.detail}
               </p>
             )}
 
-            {activeSchedule && (
+            {!dayPlan && status.tier === "closed" && (
+              <NextUpLine next={status.next} className="mt-2" />
+            )}
+
+            {planLocationName && (
               <p className="mt-2.5 flex items-start gap-1.5 text-[13px] text-ink-soft">
                 <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-brand" />
-                {activeSchedule.location_name}
+                {planLocationName}
                 {status.isRegionFallback && " · exact spot to be confirmed"}
               </p>
             )}

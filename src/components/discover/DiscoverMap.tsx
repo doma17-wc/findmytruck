@@ -48,8 +48,16 @@ interface PinMeta {
   hasEvent: boolean;
 }
 
+export interface EventPin {
+  id: string;
+  name: string;
+  coord: [number, number];
+}
+
 interface DiscoverMapProps {
   entries: DiscoverEntry[];
+  /** Standalone event markers — only set when the day selector picks a day. */
+  eventPins?: EventPin[];
   userLocation: [number, number] | null;
   cityCenter: [number, number] | null;
   hoveredId: string | null;
@@ -57,11 +65,13 @@ interface DiscoverMapProps {
   boostedCount: number;
   onHover: (id: string | null) => void;
   onSelect: (id: string) => void;
+  onSelectEvent?: (id: string) => void;
   onRequestLocation?: () => void;
 }
 
 export default function DiscoverMap({
   entries,
+  eventPins = [],
   userLocation,
   cityCenter,
   hoveredId,
@@ -69,11 +79,15 @@ export default function DiscoverMap({
   boostedCount,
   onHover,
   onSelect,
+  onSelectEvent,
   onRequestLocation,
 }: DiscoverMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
   const markersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
+  const eventMarkersRef = useRef<Map<string, mapboxgl.Marker>>(new Map());
+  const onSelectEventRef = useRef(onSelectEvent);
+  onSelectEventRef.current = onSelectEvent;
   // The styled inner button for each pin. NB: this is a CHILD of the element
   // Mapbox owns — never touch the marker's own element (Mapbox writes `transform`
   // and its positioning classes onto it every frame; reassigning className there
@@ -113,6 +127,7 @@ export default function DiscoverMap({
       map.remove();
       mapRef.current = null;
       markersRef.current.clear();
+      eventMarkersRef.current.clear();
       pinElsRef.current.clear();
       badgeElsRef.current.clear();
       metaRef.current.clear();
@@ -235,6 +250,40 @@ export default function DiscoverMap({
     for (const id of markersRef.current.keys()) applyPinStyle(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hoveredId, selectedId]);
+
+  // Standalone event markers (day-selector view). Rebuilt / pruned like the
+  // truck markers; empty `eventPins` (the Today view) leaves the map untouched.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const nextIds = new Set(eventPins.map((p) => p.id));
+    for (const [id, marker] of eventMarkersRef.current) {
+      if (!nextIds.has(id)) {
+        marker.remove();
+        eventMarkersRef.current.delete(id);
+      }
+    }
+
+    eventPins.forEach((p) => {
+      const existing = eventMarkersRef.current.get(p.id);
+      if (existing) {
+        existing.setLngLat(p.coord);
+        return;
+      }
+      const el = document.createElement("button");
+      el.type = "button";
+      el.className = "fmt-event-pin";
+      el.setAttribute("aria-label", `${p.name} — event`);
+      el.textContent = "🎪";
+      el.addEventListener("click", (e) => {
+        e.stopPropagation();
+        onSelectEventRef.current?.(p.id);
+      });
+      const marker = new mapboxgl.Marker({ element: el }).setLngLat(p.coord).addTo(map);
+      eventMarkersRef.current.set(p.id, marker);
+    });
+  }, [eventPins, mapReady]);
 
   // Fly to the selected truck
   useEffect(() => {

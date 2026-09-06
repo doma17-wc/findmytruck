@@ -1,9 +1,9 @@
 import type { TruckWithSchedules } from "@/lib/data";
-import type { EventWithTrucks } from "@/lib/types";
-import { computeTruckStatus, readBoost } from "@/lib/geo";
-import { isEventOngoing } from "@/lib/events";
+import type { EventWithTrucks, TruckSchedule } from "@/lib/types";
+import { computeTruckStatus, computeTruckDayPlan, readBoost, type TruckStatus } from "@/lib/geo";
+import { dateStr, isEventOngoing } from "@/lib/events";
 import { regionFallbackStatus } from "@/lib/unclaimed";
-import type { DiscoverEntry, TruckRating } from "./types";
+import type { DayPlan, DiscoverEntry, TruckRating } from "./types";
 
 /** True when a truck reads as available right now — boosted OR open by schedule. */
 export function isAvailableNow(entry: DiscoverEntry): boolean {
@@ -44,6 +44,81 @@ export function buildEntries(
         rating: ratings[truck.id] ?? null,
         events,
         activeEvent,
+      };
+    })
+    .filter((e): e is DiscoverEntry => e !== null);
+}
+
+/**
+ * Entries for a specific planned day (not "Today"). A truck shows up when it has
+ * a schedule slot that day (weekly tour, honouring alternate/monthly frequency)
+ * OR an event covering that date. Live open/boosted status is not computed —
+ * each entry carries a `dayPlan` with the planned hours instead.
+ */
+export function buildDayEntries(
+  trucks: TruckWithSchedules[],
+  ratings: Record<string, TruckRating>,
+  targetDate: Date,
+  eventsByTruck: Record<string, EventWithTrucks[]> = {}
+): DiscoverEntry[] {
+  const iso = dateStr(targetDate);
+
+  return trucks
+    .map(({ truck, schedules }): DiscoverEntry | null => {
+      const events = eventsByTruck[truck.id] ?? [];
+      const dayEvent =
+        events.find((e) => e.start_date <= iso && iso <= e.end_date) ?? null;
+      const plan = computeTruckDayPlan(schedules, targetDate);
+
+      if (!dayEvent && !plan) return null;
+
+      let coord: [number, number];
+      let dayPlan: DayPlan;
+      let pinSchedule: TruckSchedule | null;
+
+      if (dayEvent) {
+        coord = [dayEvent.location_lng, dayEvent.location_lat];
+        dayPlan = {
+          date: targetDate,
+          start: (dayEvent.start_time ?? plan?.primary.start ?? "").slice(0, 5),
+          end: (dayEvent.end_time ?? plan?.primary.end ?? "").slice(0, 5),
+          locationName: dayEvent.location_name,
+          fromEvent: true,
+          eventId: dayEvent.id,
+        };
+        pinSchedule = plan?.primary.schedule ?? null;
+      } else {
+        const primary = plan!.primary;
+        coord = [primary.schedule.location_lng, primary.schedule.location_lat];
+        dayPlan = {
+          date: targetDate,
+          start: primary.start,
+          end: primary.end,
+          locationName: primary.schedule.location_name,
+          fromEvent: false,
+        };
+        pinSchedule = primary.schedule;
+      }
+
+      const status: TruckStatus = {
+        tier: "open",
+        label: "Planned",
+        detail: null,
+        schedule: pinSchedule,
+        openUntil: null,
+        boostedAt: null,
+        next: null,
+      };
+
+      return {
+        truck,
+        status,
+        schedules,
+        coord,
+        rating: ratings[truck.id] ?? null,
+        events,
+        activeEvent: dayEvent,
+        dayPlan,
       };
     })
     .filter((e): e is DiscoverEntry => e !== null);

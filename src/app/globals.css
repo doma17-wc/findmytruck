@@ -251,6 +251,30 @@ body {
   }
 }
 
+/* Standalone event marker: shown on the discovery map when the day selector is
+   set to a specific planned day. A round orange disc (distinct from the teardrop
+   truck pins) with a small flag glyph. */
+.fmt-event-pin {
+  width: 30px;
+  height: 30px;
+  border-radius: 9999px;
+  background: #ff6a00;
+  border: 3px solid #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  box-shadow: 0 3px 10px rgba(255, 106, 0, 0.4);
+  transition: transform 0.16s ease, filter 0.16s ease;
+}
+.fmt-event-pin:hover {
+  filter: brightness(1.05);
+  transform: scale(1.12);
+}
+
 /* Event badge: a small corner flag on a truck's pin when it's at an event
    today. Sits as a sibling of .fmt-pin inside the Mapbox-owned wrapper, so it
    isn't affected by the pin's own 45deg rotation. */

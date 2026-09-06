@@ -8,7 +8,7 @@ import { isUnclaimed } from "@/lib/unclaimed";
 import FavoriteButton from "@/components/FavoriteButton";
 import TruckPlaceholder from "@/components/site/TruckPlaceholder";
 import type { DiscoverEntry } from "./types";
-import { RatingBadge, StatusPill } from "./Bits";
+import { DayPlanBadge, NextUpLine, RatingBadge, StatusPill } from "./Bits";
 import { useImpressionRef } from "./useImpressionRef";
 
 interface TruckCardProps {
@@ -26,11 +26,15 @@ const TruckCard = forwardRef<HTMLDivElement, TruckCardProps>(function TruckCard(
   { entry, signedIn, favorited, selected, distanceKm, isOwnerView, onSelect, onHover },
   forwardedRef
 ) {
-  const { truck, status, rating } = entry;
+  const { truck, status, rating, dayPlan } = entry;
   const image = truck.cover_photo_url ?? truck.logo_url;
   const unclaimed = isUnclaimed(truck);
   const boosted = status.tier === "boosted";
-  const cityLine = status.schedule?.location_name ?? truck.source_region ?? "Location to be confirmed";
+  const cityLine =
+    dayPlan?.locationName ??
+    status.schedule?.location_name ??
+    truck.source_region ??
+    "Location to be confirmed";
 
   const impressionRef = useImpressionRef(truck.id, isOwnerView);
   const setRefs = (el: HTMLDivElement | null) => {
@@ -71,7 +75,11 @@ const TruckCard = forwardRef<HTMLDivElement, TruckCardProps>(function TruckCard(
 
         <div className="min-w-0 flex-1 p-3.5 pr-10">
           <div className="flex items-center gap-2">
-            <StatusPill status={status} unclaimed={unclaimed} />
+            {dayPlan ? (
+              <DayPlanBadge plan={dayPlan} />
+            ) : (
+              <StatusPill status={status} unclaimed={unclaimed} />
+            )}
           </div>
 
           <h3 className="mt-1.5 truncate font-display text-[17px] font-bold leading-tight text-ink">
@@ -89,14 +97,14 @@ const TruckCard = forwardRef<HTMLDivElement, TruckCardProps>(function TruckCard(
             <span className="text-muted">📍</span> {cityLine}
           </p>
 
-          {!unclaimed && status.detail && (
+          {!unclaimed && !dayPlan && status.tier === "closed" && (
+            <NextUpLine next={status.next} className="mt-1.5" />
+          )}
+
+          {!unclaimed && !dayPlan && status.tier !== "closed" && status.detail && (
             <p
               className={`mt-1.5 inline-flex items-center gap-1 text-[12px] font-semibold ${
-                boosted
-                  ? "text-live"
-                  : status.tier === "open"
-                  ? "text-green-600"
-                  : "font-medium text-muted"
+                boosted ? "text-live" : "text-green-600"
               }`}
             >
               {boosted && <Zap className="h-3.5 w-3.5" fill="currentColor" />}

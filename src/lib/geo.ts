@@ -69,6 +69,29 @@ export interface BoostInfo {
   lng: number | null;
 }
 
+/** Rough part-of-day a service slot falls in, for friendlier "next up" copy. */
+export type MealKey = "breakfast" | "lunch" | "dinner" | "evening";
+
+export function mealKeyForHour(hour: number): MealKey {
+  if (hour < 11) return "breakfast";
+  if (hour < 15) return "lunch";
+  if (hour < 22) return "dinner";
+  return "evening";
+}
+
+/** Forward-looking "where they'll be next" summary for a closed truck. Lets the
+ *  UI phrase it invitingly ("Tomorrow, lunch · Hardbrücke 11:30–13:30") instead
+ *  of a bare "Closed". Structured (not a string) so it can be localised. */
+export interface NextAppearance {
+  /** 0 = later today, 1 = tomorrow, 2+ = further out. */
+  daysAhead: number;
+  dayOfWeek: number;
+  locationName: string;
+  start: string; // "HH:MM"
+  end: string; // "HH:MM"
+  mealKey: MealKey;
+}
+
 export interface TruckStatus {
   tier: TruckTier;
   /** Badge word: "Boosted" | "Open" | "Closed". */
@@ -82,6 +105,9 @@ export interface TruckStatus {
   openUntil: string | null;
   /** When the owner pressed Boost, for the "confirmed X ago" line. */
   boostedAt: Date | null;
+  /** Closed tier only: the truck's next scheduled appearance, for inviting
+   *  forward-looking copy. Null when nothing is scheduled ahead. */
+  next?: NextAppearance | null;
   /** True when `schedule` is a synthetic entry placing the truck at its
    * region centre because it has no real schedule yet (imported profile). */
   isRegionFallback?: boolean;
@@ -278,5 +304,54 @@ export function computeTruckStatus(
     schedule: upcoming.schedule,
     openUntil: null,
     boostedAt: null,
+    next: {
+      daysAhead: upcoming.daysAhead,
+      dayOfWeek: upcoming.schedule.day_of_week,
+      locationName: upcoming.schedule.location_name,
+      start: upcoming.schedule.start_time.slice(0, 5),
+      end: upcoming.schedule.end_time.slice(0, 5),
+      mealKey: mealKeyForHour(timeToMinutes(upcoming.schedule.start_time) / 60),
+    },
   };
+}
+
+/** A single service slot a truck runs on a given calendar date. */
+export interface DayPlanSlot {
+  schedule: TruckSchedule;
+  start: string; // "HH:MM"
+  end: string; // "HH:MM"
+}
+
+/**
+ * What a truck's day looks like on `targetDate` — every recurring/dated slot
+ * that actually runs then (honouring alternate / monthly-week frequency),
+ * earliest first. Returns null when the truck isn't out that day.
+ *
+ * Used by the homepage day selector: "who's around on Wednesday?".
+ */
+export function computeTruckDayPlan(
+  schedules: TruckSchedule[],
+  targetDate: Date
+): { primary: DayPlanSlot; all: DayPlanSlot[] } | null {
+  const dow = getMondayFirstDay(targetDate);
+  const iso = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(
+    2,
+    "0"
+  )}-${String(targetDate.getDate()).padStart(2, "0")}`;
+
+  const all = schedules
+    .filter((s) => {
+      if (s.start_time === s.end_time) return false; // region-marker placeholder
+      if (s.specific_date) return s.specific_date === iso;
+      return s.day_of_week === dow && occursOn(s, targetDate);
+    })
+    .map((s) => ({
+      schedule: s,
+      start: s.start_time.slice(0, 5),
+      end: s.end_time.slice(0, 5),
+    }))
+    .sort((a, b) => timeToMinutes(a.start) - timeToMinutes(b.start));
+
+  if (all.length === 0) return null;
+  return { primary: all[0], all };
 }

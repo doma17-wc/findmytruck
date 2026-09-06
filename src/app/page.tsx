@@ -1,6 +1,6 @@
 import DiscoverClient from "@/components/discover/DiscoverClient";
 import { getAllTrucksWithSchedules } from "@/lib/data";
-import { getUpcomingEventsByTruck } from "@/lib/events";
+import { getAllUpcomingEvents, getUpcomingEventsByTruck } from "@/lib/events";
 import { getAllTruckRatings } from "@/lib/reviews";
 import { getBooleanSetting } from "@/lib/settings";
 import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
@@ -14,7 +14,10 @@ export default async function HomePage() {
     getCurrentUserProfile(),
     getBooleanSetting("reviews_require_login", false),
   ]);
-  const eventsByTruck = await getUpcomingEventsByTruck(trucks.map((t) => t.truck.id));
+  const [eventsByTruck, allEvents] = await Promise.all([
+    getUpcomingEventsByTruck(trucks.map((t) => t.truck.id)),
+    getAllUpcomingEvents(),
+  ]);
 
   let favoritedIds: string[] = [];
   if (auth) {
@@ -31,6 +34,7 @@ export default async function HomePage() {
       initialTrucks={trucks}
       ratings={ratings}
       eventsByTruck={eventsByTruck}
+      allEvents={allEvents}
       auth={auth ? { email: auth.user.email ?? "", profile: auth.profile } : null}
       favoritedIds={favoritedIds}
       reviewsRequireLogin={reviewsRequireLogin}

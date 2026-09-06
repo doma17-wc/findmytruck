@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
 import UserMenu from "@/components/site/UserMenu";
 import NotificationBell from "@/components/notifications/NotificationBell";
+import { useLang, type Lang } from "@/lib/i18n";
 import type { AppProfile } from "@/lib/supabase/server";
 
 interface DiscoverHeaderProps {
@@ -11,7 +11,7 @@ interface DiscoverHeaderProps {
 }
 
 export default function DiscoverHeader({ auth }: DiscoverHeaderProps) {
-  const [lang, setLang] = useState<"DE" | "EN">("EN");
+  const { lang, setLang } = useLang();
   const isOwner = auth?.profile?.role === "truck_owner";
 
   return (
@@ -59,12 +59,12 @@ export default function DiscoverHeader({ auth }: DiscoverHeaderProps) {
 
       <div className="flex items-center gap-2">
         <div className="hidden overflow-hidden rounded-full border border-line text-xs font-bold sm:flex">
-          {(["DE", "EN"] as const).map((l) => (
+          {(["de", "en"] as const).map((l: Lang) => (
             <button
               key={l}
               type="button"
               onClick={() => setLang(l)}
-              className={`px-2.5 py-1 transition ${
+              className={`px-2.5 py-1 uppercase transition ${
                 lang === l ? "bg-ink text-white" : "text-muted hover:text-ink"
               }`}
             >

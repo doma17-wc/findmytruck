@@ -7,7 +7,7 @@ import { isUnclaimed } from "@/lib/unclaimed";
 import FavoriteButton from "@/components/FavoriteButton";
 import TruckPlaceholder from "@/components/site/TruckPlaceholder";
 import type { DiscoverEntry } from "./types";
-import { RatingBadge, StatusPill } from "./Bits";
+import { NextUpLine, RatingBadge, StatusPill } from "./Bits";
 import { useImpressionRef } from "./useImpressionRef";
 
 interface BrowseCardProps {
@@ -90,18 +90,18 @@ export default function BrowseCard({
           </p>
 
           <div className="mt-auto flex items-center justify-between gap-2 pt-2.5">
-            <span
-              className={`inline-flex items-center gap-1 text-[12px] font-semibold ${
-                boosted
-                  ? "text-live"
-                  : status.tier === "open"
-                  ? "text-green-600"
-                  : "font-medium text-muted"
-              }`}
-            >
-              {boosted && <Zap className="h-3.5 w-3.5" fill="currentColor" />}
-              {status.detail ?? status.label}
-            </span>
+            {status.tier === "closed" ? (
+              <NextUpLine next={status.next} />
+            ) : (
+              <span
+                className={`inline-flex items-center gap-1 text-[12px] font-semibold ${
+                  boosted ? "text-live" : "text-green-600"
+                }`}
+              >
+                {boosted && <Zap className="h-3.5 w-3.5" fill="currentColor" />}
+                {status.detail ?? status.label}
+              </span>
+            )}
             {distanceKm !== null && (
               <span className="font-mono text-[12px] text-muted">
                 {formatDistance(distanceKm)} away

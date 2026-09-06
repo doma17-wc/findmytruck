@@ -54,10 +54,14 @@ export interface TruckWithSchedules {
 /** Every active truck with its FULL weekly schedule (not just today's), so the
  * map/list can always show every truck along with when it's next open. */
 export async function getAllTrucksWithSchedules(): Promise<TruckWithSchedules[]> {
-  const schedulesSelect = `truck_schedules (
-        id, truck_id, day_of_week, location_name, location_lat, location_lng,
-        start_time, end_time, is_recurring, specific_date, notes
+  const schedulesCols = `id, truck_id, day_of_week, location_name, location_lat, location_lng,
+        start_time, end_time, is_recurring, specific_date, notes`;
+  // Frequency columns land in migration 0011 -- drives the "alternating Fridays" /
+  // "1st & 3rd week" rules the day selector relies on. Fall back if not applied.
+  const schedulesSelect = `truck_schedules (${schedulesCols},
+        frequency, frequency_parity, frequency_weeks
       )`;
+  const schedulesSelectBasic = `truck_schedules (${schedulesCols})`;
   const baseCols = `
       id, slug, name, description, cuisine_type, price_range,
       logo_url, cover_photo_url, menu_text, menu_items, menu_photo_url,
@@ -82,6 +86,10 @@ export async function getAllTrucksWithSchedules(): Promise<TruckWithSchedules[]>
   if (res.error) res = await run(`${baseCols}, ${unclaimedCols}, ${boostCols}, ${schedulesSelect}`);
   if (res.error) res = await run(`${baseCols}, ${unclaimedCols}, ${schedulesSelect}`);
   if (res.error) res = await run(`${baseCols}, ${schedulesSelect}`);
+  // Frequency columns missing (pre-0011) -- retry without them.
+  if (res.error) res = await run(`${baseCols}, ${unclaimedCols}, ${boostCols}, paused, ${schedulesSelectBasic}`);
+  if (res.error) res = await run(`${baseCols}, ${unclaimedCols}, ${boostCols}, ${schedulesSelectBasic}`);
+  if (res.error) res = await run(`${baseCols}, ${schedulesSelectBasic}`);
   const { data, error } = res;
 
   if (error) {
