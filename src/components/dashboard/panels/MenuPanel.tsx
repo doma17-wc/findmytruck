@@ -6,6 +6,7 @@ import type { Truck } from "@/lib/types";
 import { normalizeMenuItems, groupMenu, MENU_DIETARY_TAGS, type DietaryTagId, type MenuItem } from "@/lib/menu";
 import { saveMenuAction } from "@/app/dashboard/actions";
 import { Card, CardBody, useToast, cn } from "../ui";
+import DishPhotoButton from "../DishPhotoButton";
 
 interface EditItem {
   id: string;
@@ -15,7 +16,11 @@ interface EditItem {
   category: string;
   sold_out: boolean;
   dietary: DietaryTagId[];
+  photo_url: string | null;
 }
+
+type Draft = { name: string; description: string; price: string; photo_url: string | null };
+const EMPTY_DRAFT: Draft = { name: "", description: "", price: "", photo_url: null };
 
 const uid = () =>
   typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Math.random());
@@ -30,6 +35,7 @@ function toEditItems(raw: MenuItem[]): EditItem[] {
       category: g.category,
       sold_out: Boolean(it.sold_out),
       dietary: it.dietary ?? [],
+      photo_url: it.photo_url ?? null,
     }))
   );
 }
@@ -45,6 +51,7 @@ function serialize(items: EditItem[]): MenuItem[] {
         category: it.category || null,
         sold_out: it.sold_out,
         dietary: it.dietary,
+        photo_url: it.photo_url,
       }))
   );
 }
@@ -58,9 +65,7 @@ export default function MenuPanel({ truckId, truck }: { truckId: string; truck: 
     const cats = groupMenu(initial).map((g) => g.category);
     return cats.length ? cats : [""];
   });
-  const [drafts, setDrafts] = useState<Record<string, { name: string; description: string; price: string }>>(
-    {}
-  );
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
 
   const firstRender = useRef(true);
   const saveTimer = useRef<ReturnType<typeof setTimeout>>();
@@ -88,8 +93,8 @@ export default function MenuPanel({ truckId, truck }: { truckId: string; truck: 
     };
   }, [items, toast]);
 
-  const draftFor = (cat: string) => drafts[cat] ?? { name: "", description: "", price: "" };
-  const setDraft = (cat: string, patch: Partial<{ name: string; description: string; price: string }>) =>
+  const draftFor = (cat: string) => drafts[cat] ?? EMPTY_DRAFT;
+  const setDraft = (cat: string, patch: Partial<Draft>) =>
     setDrafts((prev) => ({ ...prev, [cat]: { ...draftFor(cat), ...patch } }));
 
   const updateItem = (id: string, patch: Partial<EditItem>) =>
@@ -119,9 +124,10 @@ export default function MenuPanel({ truckId, truck }: { truckId: string; truck: 
         category: cat,
         sold_out: false,
         dietary: [],
+        photo_url: d.photo_url,
       },
     ]);
-    setDrafts((prev) => ({ ...prev, [cat]: { name: "", description: "", price: "" } }));
+    setDrafts((prev) => ({ ...prev, [cat]: EMPTY_DRAFT }));
   };
 
   const addCategory = () => {
@@ -170,6 +176,11 @@ export default function MenuPanel({ truckId, truck }: { truckId: string; truck: 
                       it.sold_out && "opacity-45"
                     )}
                   >
+                    <DishPhotoButton
+                      truckId={truckId}
+                      url={it.photo_url}
+                      onChange={(url) => updateItem(it.id, { photo_url: url })}
+                    />
                     <div className="min-w-0 flex-1 space-y-1">
                       <input
                         value={it.name}
@@ -249,6 +260,11 @@ export default function MenuPanel({ truckId, truck }: { truckId: string; truck: 
 
               {/* Add-a-dish row */}
               <div className="flex flex-wrap items-center gap-2 pt-3">
+                <DishPhotoButton
+                  truckId={truckId}
+                  url={draftFor(cat).photo_url}
+                  onChange={(url) => setDraft(cat, { photo_url: url })}
+                />
                 <input
                   value={draftFor(cat).name}
                   onChange={(e) => setDraft(cat, { name: e.target.value })}

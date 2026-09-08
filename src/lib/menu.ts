@@ -15,6 +15,12 @@ export interface MenuItem {
   sold_out?: boolean;
   /** Per-dish dietary tags, owner-set from the menu builder. Absent === []. */
   dietary?: DietaryTagId[];
+  /**
+   * Optional dish photo (owner-uploaded from the menu builder). Stored as a
+   * plain URL string on the same jsonb array — no migration. Absent === none,
+   * and the public menu falls back to a clean text row.
+   */
+  photo_url?: string | null;
 }
 
 export const MENU_DIETARY_TAGS: { id: DietaryTagId; label: string; className: string }[] = [
@@ -77,6 +83,10 @@ export function normalizeMenuItems(raw: unknown): MenuItem[] {
         typeof o.category === "string" && o.category.trim() ? o.category.trim() : null;
       const sold_out = o.sold_out === true || o.sold_out === "true";
       const dietary = normalizeDietary(o.dietary);
+      const photo_url =
+        typeof o.photo_url === "string" && /^https?:\/\//i.test(o.photo_url.trim())
+          ? o.photo_url.trim().slice(0, 500)
+          : null;
 
       return {
         name: name.slice(0, 120),
@@ -85,6 +95,7 @@ export function normalizeMenuItems(raw: unknown): MenuItem[] {
         category: category?.slice(0, 60) ?? null,
         sold_out,
         ...(dietary.length > 0 ? { dietary } : {}),
+        ...(photo_url ? { photo_url } : {}),
       };
     })
     .filter((x): x is MenuItem => x !== null)

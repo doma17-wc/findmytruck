@@ -6,6 +6,7 @@ import type { Truck } from "@/lib/types";
 import { normalizeMenuItems, groupMenu, MENU_DIETARY_TAGS, type DietaryTagId, type MenuItem } from "@/lib/menu";
 import { saveTruckMenuAction } from "@/app/admin/actions";
 import { cn } from "./ui";
+import DishPhotoButton from "@/components/dashboard/DishPhotoButton";
 
 interface EditItem {
   id: string;
@@ -15,7 +16,11 @@ interface EditItem {
   category: string;
   sold_out: boolean;
   dietary: DietaryTagId[];
+  photo_url: string | null;
 }
+
+type Draft = { name: string; description: string; price: string; photo_url: string | null };
+const EMPTY_DRAFT: Draft = { name: "", description: "", price: "", photo_url: null };
 
 const uid = () =>
   typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : String(Math.random());
@@ -30,6 +35,7 @@ function toEditItems(raw: MenuItem[]): EditItem[] {
       category: g.category,
       sold_out: Boolean(it.sold_out),
       dietary: it.dietary ?? [],
+      photo_url: it.photo_url ?? null,
     }))
   );
 }
@@ -45,6 +51,7 @@ function serialize(items: EditItem[]): MenuItem[] {
         category: it.category || null,
         sold_out: it.sold_out,
         dietary: it.dietary,
+        photo_url: it.photo_url,
       }))
   );
 }
@@ -56,15 +63,15 @@ export default function AdminMenuBuilder({ truck }: { truck: Truck }) {
     const cats = groupMenu(initial).map((g) => g.category);
     return cats.length ? cats : [""];
   });
-  const [drafts, setDrafts] = useState<Record<string, { name: string; description: string; price: string }>>({});
+  const [drafts, setDrafts] = useState<Record<string, Draft>>({});
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
 
   const savedSnapshot = useMemo(() => JSON.stringify(serialize(toEditItems(initial))), [initial]);
   const dirty = JSON.stringify(serialize(items)) !== savedSnapshot;
 
-  const draftFor = (cat: string) => drafts[cat] ?? { name: "", description: "", price: "" };
-  const setDraft = (cat: string, patch: Partial<{ name: string; description: string; price: string }>) =>
+  const draftFor = (cat: string) => drafts[cat] ?? EMPTY_DRAFT;
+  const setDraft = (cat: string, patch: Partial<Draft>) =>
     setDrafts((prev) => ({ ...prev, [cat]: { ...draftFor(cat), ...patch } }));
 
   const updateItem = (id: string, patch: Partial<EditItem>) =>
@@ -85,9 +92,9 @@ export default function AdminMenuBuilder({ truck }: { truck: Truck }) {
     if (!d.name.trim()) return;
     setItems((prev) => [
       ...prev,
-      { id: uid(), name: d.name.trim(), description: d.description.trim(), price: d.price.trim(), category: cat, sold_out: false, dietary: [] },
+      { id: uid(), name: d.name.trim(), description: d.description.trim(), price: d.price.trim(), category: cat, sold_out: false, dietary: [], photo_url: d.photo_url },
     ]);
-    setDrafts((prev) => ({ ...prev, [cat]: { name: "", description: "", price: "" } }));
+    setDrafts((prev) => ({ ...prev, [cat]: EMPTY_DRAFT }));
   };
 
   const addCategory = () => {
@@ -135,6 +142,11 @@ export default function AdminMenuBuilder({ truck }: { truck: Truck }) {
             <div className="divide-y divide-line">
               {rows.map((it) => (
                 <div key={it.id} className={cn("flex items-start gap-2 py-2.5", it.sold_out && "opacity-45")}>
+                  <DishPhotoButton
+                    truckId={truck.id}
+                    url={it.photo_url}
+                    onChange={(url) => updateItem(it.id, { photo_url: url })}
+                  />
                   <div className="min-w-0 flex-1 space-y-1">
                     <input
                       value={it.name}
@@ -207,6 +219,11 @@ export default function AdminMenuBuilder({ truck }: { truck: Truck }) {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 pt-3">
+              <DishPhotoButton
+                truckId={truck.id}
+                url={draftFor(cat).photo_url}
+                onChange={(url) => setDraft(cat, { photo_url: url })}
+              />
               <input
                 value={draftFor(cat).name}
                 onChange={(e) => setDraft(cat, { name: e.target.value })}
