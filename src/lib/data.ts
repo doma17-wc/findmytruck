@@ -73,6 +73,11 @@ export async function getAllTrucksWithSchedules(): Promise<TruckWithSchedules[]>
   // been applied.
   const unclaimedCols = `claim_status, source_region, source_website, region_lat, region_lng`;
   const boostCols = `boosted, boost_expires_at, boost_started_at, boost_lat, boost_lng`;
+  // Catering columns land in migration 0016 -- tried once up front, then this
+  // whole chain falls back to its pre-catering form below if that's missing.
+  const cateringCols = `catering_available, catering_description, catering_offerings, catering_area,
+      catering_min_guests, catering_max_guests, catering_photos,
+      catering_contact_email, catering_contact_phone`;
 
   const run = (cols: string) =>
     supabase
@@ -81,8 +86,13 @@ export async function getAllTrucksWithSchedules(): Promise<TruckWithSchedules[]>
       .eq("is_active", true)
       .order("name", { ascending: true });
 
-  // `paused` lands in migration 0008 -- try it first, then fall back.
-  let res = await run(`${baseCols}, ${unclaimedCols}, ${boostCols}, paused, ${schedulesSelect}`);
+  // `catering_*` lands in migration 0016 -- try it first, then fall back to
+  // the pre-catering chain unchanged.
+  let res = await run(
+    `${baseCols}, ${unclaimedCols}, ${boostCols}, paused, ${cateringCols}, ${schedulesSelect}`
+  );
+  // `paused` lands in migration 0008 -- try it next, then fall back.
+  if (res.error) res = await run(`${baseCols}, ${unclaimedCols}, ${boostCols}, paused, ${schedulesSelect}`);
   if (res.error) res = await run(`${baseCols}, ${unclaimedCols}, ${boostCols}, ${schedulesSelect}`);
   if (res.error) res = await run(`${baseCols}, ${unclaimedCols}, ${schedulesSelect}`);
   if (res.error) res = await run(`${baseCols}, ${schedulesSelect}`);
@@ -115,6 +125,24 @@ export async function getAllActiveTrucks(): Promise<PublicTruck[]> {
 
   if (error) {
     console.error("getAllActiveTrucks error", error);
+    return [];
+  }
+  return ((data ?? []) as PublicTruck[]).filter((t) => !t.paused);
+}
+
+/** Every active, non-paused truck advertising catering (migration 0016), for
+ *  the /catering directory. */
+export async function getCateringTrucks(): Promise<PublicTruck[]> {
+  const { data, error } = await supabase
+    .from("public_trucks")
+    .select("*")
+    .eq("is_active", true)
+    .eq("catering_available", true)
+    .order("name", { ascending: true });
+
+  if (error) {
+    // Most likely migration 0016 hasn't been applied yet -- fail soft.
+    console.error("getCateringTrucks error", error);
     return [];
   }
   return ((data ?? []) as PublicTruck[]).filter((t) => !t.paused);

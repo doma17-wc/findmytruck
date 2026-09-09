@@ -27,6 +27,12 @@ export default function Header({ auth }: HeaderProps) {
           >
             Browse all trucks
           </Link>
+          <Link
+            href="/catering"
+            className="text-sm font-medium text-neutral-300 transition hover:text-white"
+          >
+            Catering
+          </Link>
           {auth?.profile?.role === "truck_owner" && (
             <Link
               href="/dashboard"

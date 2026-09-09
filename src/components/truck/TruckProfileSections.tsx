@@ -11,6 +11,7 @@ import MenuBoard from "./MenuBoard";
 import WeeklyTour from "./WeeklyTour";
 import StatusCard from "./StatusCard";
 import TruckEventCard from "./TruckEventCard";
+import CateringSection from "./CateringSection";
 import { ProfileStatusPill, RatingLine, SectionHeading } from "./pieces";
 
 export interface ProfileStatus {
@@ -186,6 +187,9 @@ export default function TruckProfileSections({
           )}
         </section>
       )}
+
+      {/* Catering */}
+      <CateringSection truck={truck} />
 
       {/* Claim CTA */}
       {unclaimed && (

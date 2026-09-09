@@ -8,6 +8,7 @@ import {
   UtensilsCrossed,
   CalendarDays,
   PartyPopper,
+  ConciergeBell,
   Star,
   BarChart3,
   Settings as SettingsIcon,
@@ -23,6 +24,7 @@ import BoostPanel from "./panels/BoostPanel";
 import MenuPanel from "./panels/MenuPanel";
 import SchedulePanel from "./panels/SchedulePanel";
 import EventsPanel from "./panels/EventsPanel";
+import CateringPanel from "./panels/CateringPanel";
 import ReviewsPanel from "./panels/ReviewsPanel";
 import InsightsPanel from "./panels/InsightsPanel";
 import SettingsPanel from "./panels/SettingsPanel";
@@ -64,6 +66,7 @@ type PanelKey =
   | "menu"
   | "schedule"
   | "events"
+  | "catering"
   | "reviews"
   | "insights"
   | "settings";
@@ -74,6 +77,7 @@ const NAV: { key: PanelKey; label: string; icon: typeof LayoutGrid }[] = [
   { key: "menu", label: "Menu", icon: UtensilsCrossed },
   { key: "schedule", label: "Tour schedule", icon: CalendarDays },
   { key: "events", label: "Events", icon: PartyPopper },
+  { key: "catering", label: "Catering", icon: ConciergeBell },
   { key: "reviews", label: "Reviews", icon: Star },
   { key: "insights", label: "Insights", icon: BarChart3 },
   { key: "settings", label: "Settings", icon: SettingsIcon },
@@ -85,6 +89,7 @@ const HEADINGS: Record<PanelKey, { title: string; subtitle: string }> = {
   menu: { title: "Menu", subtitle: "Prices update on your public profile instantly" },
   schedule: { title: "Tour schedule", subtitle: "Your regular weekly stops" },
   events: { title: "Events", subtitle: "One-off appearances — festivals, markets, private events" },
+  catering: { title: "Catering", subtitle: "Advertise private & corporate catering — customers contact you directly" },
   reviews: { title: "Reviews", subtitle: "What customers are saying" },
   insights: { title: "Insights", subtitle: "Trends across your pitches and week" },
   settings: { title: "Settings", subtitle: "Profile, payment, photos" },
@@ -237,6 +242,9 @@ export default function DashboardApp(props: Props) {
                   attending={props.events.attending}
                   invitations={props.events.invitations}
                 />
+              )}
+              {active === "catering" && (
+                <CateringPanel truckId={truck.id} truck={truck} ownerEmail={props.ownerEmail} />
               )}
               {active === "reviews" && <ReviewsPanel truckId={truck.id} reviews={props.reviews} />}
               {active === "insights" && <InsightsPanel stats={props.stats} />}

@@ -16,6 +16,12 @@ import {
   notifyTruckJoined,
 } from "@/lib/email";
 import { normalizeEventType, type EventType, type ScheduleFrequency } from "@/lib/types";
+import {
+  normalizeCateringOfferings,
+  normalizeCateringPhotos,
+  type CateringOffering,
+  type CateringPhoto,
+} from "@/lib/catering";
 
 /** Verify the current user owns `truckId` (via `truck_owners`, migration 0014)
  *  and return it. Every dashboard mutation is scoped to the truck the switcher
@@ -778,6 +784,146 @@ export async function setCoverOwnPhotoAction(truckId: string, photoId: string) {
 
   await syncCoverPhoto(supabase, truckId);
   revalidateEverywhere();
+}
+
+/* ------------------------------------------------------------------ *
+ * CATERING  (migration 0016) -- fields live directly on `trucks`, separate
+ * from events and the weekly tour. No booking/payment: customers contact the
+ * truck directly, so these actions only ever save what the owner typed.
+ * ------------------------------------------------------------------ */
+
+export async function setCateringAvailableAction(
+  truckId: string,
+  available: boolean
+): Promise<ActionResult> {
+  await requireOwnedTruckId(truckId);
+  const supabase = createClient();
+
+  const { error } = await supabase
+    .from("trucks")
+    .update({ catering_available: available })
+    .eq("id", truckId);
+  if (error) return { error: error.message };
+
+  revalidateCatering();
+  return { success: true };
+}
+
+export interface CateringInput {
+  description: string;
+  area: string;
+  minGuests: string; // "" = blank
+  maxGuests: string;
+  contactEmail: string;
+  contactPhone: string;
+  offerings: CateringOffering[];
+}
+
+function parseGuestCount(raw: string): number | null {
+  const n = Number(raw.trim());
+  return raw.trim() !== "" && Number.isFinite(n) && n > 0 ? Math.round(n) : null;
+}
+
+export async function saveCateringAction(
+  truckId: string,
+  input: CateringInput
+): Promise<ActionResult> {
+  await requireOwnedTruckId(truckId);
+  const supabase = createClient();
+
+  const minGuests = parseGuestCount(input.minGuests);
+  const maxGuests = parseGuestCount(input.maxGuests);
+  if (minGuests !== null && maxGuests !== null && minGuests > maxGuests) {
+    return { error: "Min guests can't be more than max guests." };
+  }
+
+  const payload = {
+    catering_description: input.description.trim().slice(0, 3000) || null,
+    catering_area: input.area.trim().slice(0, 200) || null,
+    catering_min_guests: minGuests,
+    catering_max_guests: maxGuests,
+    catering_contact_email: input.contactEmail.trim().slice(0, 200) || null,
+    catering_contact_phone: input.contactPhone.trim().slice(0, 60) || null,
+    catering_offerings: normalizeCateringOfferings(input.offerings),
+  };
+
+  const { error } = await supabase.from("trucks").update(payload).eq("id", truckId);
+  if (error) return { error: error.message };
+
+  revalidateCatering();
+  return { success: true };
+}
+
+function revalidateCatering() {
+  revalidateEverywhere();
+  revalidatePath("/catering");
+}
+
+async function readCateringPhotos(supabase: SupabaseServer, truckId: string): Promise<CateringPhoto[]> {
+  const { data } = await supabase
+    .from("trucks")
+    .select("catering_photos")
+    .eq("id", truckId)
+    .maybeSingle();
+  return normalizeCateringPhotos((data as { catering_photos: unknown } | null)?.catering_photos);
+}
+
+async function writeCateringPhotos(supabase: SupabaseServer, truckId: string, photos: CateringPhoto[]) {
+  await supabase.from("trucks").update({ catering_photos: photos }).eq("id", truckId);
+}
+
+export async function addCateringPhotoAction(truckId: string, url: string) {
+  await requireOwnedTruckId(truckId);
+  const supabase = createClient();
+
+  const photos = await readCateringPhotos(supabase, truckId);
+  photos.push({ id: crypto.randomUUID(), url, caption: null });
+  await writeCateringPhotos(supabase, truckId, photos);
+  revalidateCatering();
+}
+
+export async function deleteCateringPhotoAction(truckId: string, photoId: string) {
+  await requireOwnedTruckId(truckId);
+  const supabase = createClient();
+
+  const photos = await readCateringPhotos(supabase, truckId);
+  const removed = photos.find((p) => p.id === photoId);
+  await writeCateringPhotos(
+    supabase,
+    truckId,
+    photos.filter((p) => p.id !== photoId)
+  );
+
+  const path = storagePathFromPublicUrl(removed?.url);
+  if (path) {
+    await supabase.storage.from(PHOTO_BUCKET).remove([path]);
+  }
+  revalidateCatering();
+}
+
+export async function reorderCateringPhotosAction(truckId: string, orderedIds: string[]) {
+  await requireOwnedTruckId(truckId);
+  const supabase = createClient();
+
+  const photos = await readCateringPhotos(supabase, truckId);
+  const byId = new Map(photos.map((p) => [p.id, p]));
+  const reordered = orderedIds.map((id) => byId.get(id)).filter((p): p is CateringPhoto => Boolean(p));
+  await writeCateringPhotos(supabase, truckId, reordered);
+  revalidateCatering();
+}
+
+export async function setCoverCateringPhotoAction(truckId: string, photoId: string) {
+  await requireOwnedTruckId(truckId);
+  const supabase = createClient();
+
+  const photos = await readCateringPhotos(supabase, truckId);
+  const idx = photos.findIndex((p) => p.id === photoId);
+  if (idx > 0) {
+    const [moved] = photos.splice(idx, 1);
+    photos.unshift(moved);
+  }
+  await writeCateringPhotos(supabase, truckId, photos);
+  revalidateCatering();
 }
 
 /* ------------------------------------------------------------------ *

@@ -47,6 +47,20 @@ export interface PublicTruck {
   /** Admin "pause" (migration 0008). A paused truck keeps all its data but is
    *  hidden from every public surface. May be absent on rows read before 0008. */
   paused?: boolean | null;
+  /** Catering system (migration 0016) -- separate from events and the weekly
+   *  tour. May be absent on rows read before that migration -- always fall
+   *  back to "not available" (see src/lib/catering.ts's normalize helpers). */
+  catering_available?: boolean | null;
+  catering_description?: string | null;
+  /** Ordered free-text packages -- see CateringOffering in src/lib/catering.ts. */
+  catering_offerings?: unknown;
+  catering_area?: string | null;
+  catering_min_guests?: number | null;
+  catering_max_guests?: number | null;
+  /** Ordered { id, url, caption } photos -- see CateringPhoto in src/lib/catering.ts. */
+  catering_photos?: unknown;
+  catering_contact_email?: string | null;
+  catering_contact_phone?: string | null;
 }
 
 export type ClaimStatus = "unclaimed" | "pending" | "claimed";
