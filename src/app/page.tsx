@@ -1,4 +1,5 @@
 import DiscoverClient from "@/components/discover/DiscoverClient";
+import Footer from "@/components/site/Footer";
 import { getAllTrucksWithSchedules } from "@/lib/data";
 import { getAllUpcomingEvents, getUpcomingEventsByTruck } from "@/lib/events";
 import { getAllTruckRatings } from "@/lib/reviews";
@@ -30,22 +31,25 @@ export default async function HomePage() {
   }
 
   return (
-    <DiscoverClient
-      initialTrucks={trucks}
-      ratings={ratings}
-      eventsByTruck={eventsByTruck}
-      allEvents={allEvents}
-      auth={
-        auth
-          ? {
-              email: auth.user.email ?? "",
-              profile: auth.profile,
-              ownedTruckIds: auth.ownedTruckIds,
-            }
-          : null
-      }
-      favoritedIds={favoritedIds}
-      reviewsRequireLogin={reviewsRequireLogin}
-    />
+    <>
+      <DiscoverClient
+        initialTrucks={trucks}
+        ratings={ratings}
+        eventsByTruck={eventsByTruck}
+        allEvents={allEvents}
+        auth={
+          auth
+            ? {
+                email: auth.user.email ?? "",
+                profile: auth.profile,
+                ownedTruckIds: auth.ownedTruckIds,
+              }
+            : null
+        }
+        favoritedIds={favoritedIds}
+        reviewsRequireLogin={reviewsRequireLogin}
+      />
+      <Footer />
+    </>
   );
 }
