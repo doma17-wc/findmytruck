@@ -29,11 +29,14 @@ const CSV_PATH = path.join(ROOT, "trucks-import.csv");
 const DRY_RUN = process.argv.includes("--dry-run");
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Writes directly to `trucks` -- the anon-write policy this used to rely on
+// has been removed (raw public writes to trucks are no longer allowed), so
+// this now needs the service-role key, same as the admin panel.
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error("Missing NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY. Run with: node --env-file=.env.local scripts/import-trucks.mjs");
+if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+  console.error("Missing NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY. Run with: node --env-file=.env.local scripts/import-trucks.mjs");
   process.exit(1);
 }
 if (!MAPBOX_TOKEN) {
@@ -41,7 +44,7 @@ if (!MAPBOX_TOKEN) {
   process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 

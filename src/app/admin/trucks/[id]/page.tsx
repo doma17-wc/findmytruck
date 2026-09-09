@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { getServiceSupabase } from "@/lib/supabase/admin";
 import type { Truck, TruckSchedule, TruckPhoto } from "@/lib/types";
 import { getEventsForTruck } from "@/lib/events";
 import TruckForm from "@/components/admin/TruckForm";
@@ -22,9 +23,22 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default async function EditTruckPage({ params }: { params: { id: string } }) {
+  const service = getServiceSupabase();
+  if (!service) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16 text-center">
+        <h1 className="font-display text-lg font-bold text-ink">Service role key missing</h1>
+        <p className="mt-2 text-sm text-muted">
+          Set <code className="rounded bg-paper-deep px-1.5 py-0.5">SUPABASE_SERVICE_ROLE_KEY</code> in
+          the environment to edit trucks — raw public access to the trucks table was removed.
+        </p>
+      </div>
+    );
+  }
+
   const [{ data: truck }, { data: schedules }, { data: photos }, { data: redirect }, events] =
     await Promise.all([
-      supabase.from("trucks").select("*").eq("id", params.id).maybeSingle(),
+      service.from("trucks").select("*").eq("id", params.id).maybeSingle(),
       supabase
         .from("truck_schedules")
         .select("*")

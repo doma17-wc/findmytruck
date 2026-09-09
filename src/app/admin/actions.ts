@@ -65,6 +65,12 @@ export async function saveTruckAction(
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Name is required." };
 
+  // Writes to `trucks` require the service-role key -- the anon-write policy
+  // that used to let this go through the plain client has been removed
+  // (see migration 0018_lock_down_trucks_rls.sql).
+  const service = getServiceSupabase();
+  if (!service) return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to manage trucks." };
+
   const csv = (key: string) =>
     String(formData.get(key) ?? "")
       .split(",")
@@ -134,13 +140,13 @@ export async function saveTruckAction(
 
   let id = truckId;
   if (truckId) {
-    const { error } = await supabase
+    const { error } = await service
       .from("trucks")
       .update({ ...payload, ...boostPayload })
       .eq("id", truckId);
     if (error) return { error: error.message };
   } else {
-    const { data, error } = await supabase
+    const { data, error } = await service
       .from("trucks")
       .insert({ ...payload, ...boostPayload })
       .select("id")
@@ -149,7 +155,7 @@ export async function saveTruckAction(
     id = data.id;
   }
 
-  const { error: pausedErr } = await supabase
+  const { error: pausedErr } = await service
     .from("trucks")
     .update({ paused })
     .eq("id", id!);
@@ -165,8 +171,11 @@ export async function saveTruckAction(
 }
 
 export async function saveTruckMenuAction(truckId: string, items: unknown) {
+  const service = getServiceSupabase();
+  if (!service) return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to manage trucks." };
+
   const menuItems = normalizeMenuItems(items);
-  const { error } = await supabase
+  const { error } = await service
     .from("trucks")
     .update({ menu_items: menuItems })
     .eq("id", truckId);
@@ -177,26 +186,32 @@ export async function saveTruckMenuAction(truckId: string, items: unknown) {
 }
 
 export async function deleteTruckAction(truckId: string) {
-  // Detach any owner account first so no profile is left pointing at a dead
-  // truck (best effort -- only possible with the service-role key).
   const service = getServiceSupabase();
-  if (service) {
-    await service.rpc("admin_unlink_truck_owner", { p_truck_id: truckId });
-  }
-  const { error } = await supabase.from("trucks").delete().eq("id", truckId);
+  if (!service) return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to manage trucks." };
+
+  // Detach any owner account first so no profile is left pointing at a dead truck.
+  await service.rpc("admin_unlink_truck_owner", { p_truck_id: truckId });
+
+  const { error } = await service.from("trucks").delete().eq("id", truckId);
   if (error) return { error: error.message };
   revalidatePublic();
   return { success: true };
 }
 
 export async function pauseTruckAction(truckId: string, paused: boolean) {
-  const { error } = await supabase.from("trucks").update({ paused }).eq("id", truckId);
+  const service = getServiceSupabase();
+  if (!service) return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to manage trucks." };
+
+  const { error } = await service.from("trucks").update({ paused }).eq("id", truckId);
   if (error) return { error: error.message };
   revalidatePublic();
   return { success: true };
 }
 
 export async function setBoostOverrideAction(truckId: string, on: boolean) {
+  const service = getServiceSupabase();
+  if (!service) return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to manage trucks." };
+
   const payload = on
     ? {
         boosted: true,
@@ -210,7 +225,7 @@ export async function setBoostOverrideAction(truckId: string, on: boolean) {
         boost_lat: null,
         boost_lng: null,
       };
-  const { error } = await supabase.from("trucks").update(payload).eq("id", truckId);
+  const { error } = await service.from("trucks").update(payload).eq("id", truckId);
   if (error) return { error: error.message };
   revalidatePublic();
   return { success: true };
@@ -231,10 +246,14 @@ export async function setReviewsRequireLoginAction(on: boolean) {
 
 /** Approve a pending claim: mark the profile fully claimed + verified. */
 export async function approveClaimAction(truckId: string) {
-  await supabase
+  const service = getServiceSupabase();
+  if (!service) return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to manage trucks." };
+
+  const { error } = await service
     .from("trucks")
     .update({ claim_status: "claimed", is_claimed: true })
     .eq("id", truckId);
+  if (error) return { error: error.message };
   revalidatePublic();
   return { success: true };
 }
@@ -243,10 +262,14 @@ export async function setClaimStatusAction(
   truckId: string,
   status: "unclaimed" | "pending" | "claimed"
 ) {
-  await supabase
+  const service = getServiceSupabase();
+  if (!service) return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to manage trucks." };
+
+  const { error } = await service
     .from("trucks")
     .update({ claim_status: status, is_claimed: status === "claimed" })
     .eq("id", truckId);
+  if (error) return { error: error.message };
   revalidatePublic();
   return { success: true };
 }
@@ -479,7 +502,11 @@ async function syncCoverPhoto(truckId: string) {
     .limit(1)
     .maybeSingle();
 
-  await supabase.from("trucks").update({ cover_photo_url: first?.url ?? null }).eq("id", truckId);
+  // Best-effort cosmetic mirror -- skip quietly if the service key isn't set
+  // rather than failing the photo action that called this.
+  const service = getServiceSupabase();
+  if (!service) return;
+  await service.from("trucks").update({ cover_photo_url: first?.url ?? null }).eq("id", truckId);
 }
 
 export async function addPhotoAction(truckId: string, url: string, caption: string) {
@@ -560,7 +587,12 @@ export async function generateQrCodeAction(truckId: string, slug: string) {
     destination_url: destinationUrl,
   });
 
-  await supabase.from("trucks").update({ short_code: shortCode }).eq("id", truckId);
+  // trucks.short_code is just a display mirror (the redirect itself resolves
+  // via qr_redirects above) -- skip quietly if the service key isn't set.
+  const service = getServiceSupabase();
+  if (service) {
+    await service.from("trucks").update({ short_code: shortCode }).eq("id", truckId);
+  }
 
   revalidatePath(`/admin/trucks/${truckId}`);
 }

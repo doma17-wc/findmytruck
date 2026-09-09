@@ -32,14 +32,17 @@
 import { createClient } from "@supabase/supabase-js";
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+// Writes directly to `trucks` -- the anon-write policy this used to rely on
+// has been removed, so this now needs the service-role key, same as the
+// admin panel and scripts/import-trucks.mjs.
+const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN;
 const DRY_RUN = process.argv.includes("--dry-run");
 const SQL_MODE = process.argv.includes("--sql");
 const log = SQL_MODE ? (...a) => console.error(...a) : (...a) => console.log(...a);
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error("Missing Supabase env. Run: node --env-file=.env.local scripts/regeocode-regions.mjs");
+if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
+  console.error("Missing Supabase env (need SUPABASE_SERVICE_ROLE_KEY now, not the anon key). Run: node --env-file=.env.local scripts/regeocode-regions.mjs");
   process.exit(1);
 }
 if (!MAPBOX_TOKEN) {
@@ -47,7 +50,7 @@ if (!MAPBOX_TOKEN) {
   process.exit(1);
 }
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, { auth: { persistSession: false } });
 
 // Geographic centre of the Swiss plateau — fallback for country-wide rows.
 const CH_CENTRE = [46.9480, 7.8213]; // roughly Bern/Mittelland, where people are

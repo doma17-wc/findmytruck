@@ -23,6 +23,18 @@ function dateStr(d: Date): string {
 
 export default async function AdminDashboardPage() {
   const service = getServiceSupabase();
+  if (!service) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16 text-center">
+        <h1 className="font-display text-lg font-bold text-ink">Service role key missing</h1>
+        <p className="mt-2 text-sm text-muted">
+          Set <code className="rounded bg-paper-deep px-1.5 py-0.5">SUPABASE_SERVICE_ROLE_KEY</code> in
+          the environment — the admin panel now reads and writes trucks exclusively through the
+          service-role client (raw public access to the trucks table was removed).
+        </p>
+      </div>
+    );
+  }
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY);
 
@@ -34,7 +46,7 @@ export default async function AdminDashboardPage() {
     { data: viewRows },
     events,
   ] = await Promise.all([
-    supabase.from("trucks").select("*").order("created_at", { ascending: false }),
+    service.from("trucks").select("*").order("created_at", { ascending: false }),
     supabase.from("qr_redirects").select("truck_id, scan_count"),
     supabase.from("reviews").select("id, truck_id"),
     supabase
