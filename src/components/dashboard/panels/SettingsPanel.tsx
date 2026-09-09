@@ -86,6 +86,54 @@ function Chips({
   );
 }
 
+function PrivacyToggle({
+  name,
+  defaultChecked,
+  label,
+  hint,
+}: {
+  name: string;
+  defaultChecked: boolean;
+  label: string;
+  hint: string;
+}) {
+  const [checked, setChecked] = useState(defaultChecked);
+  return (
+    <label className="flex items-start justify-between gap-4 rounded-xl border border-line bg-paper px-3.5 py-3">
+      <span>
+        <span className="block text-sm font-semibold text-ink">{label}</span>
+        <span className="mt-0.5 block text-[13px] text-muted">{hint}</span>
+      </span>
+      <span className="flex-shrink-0 pt-0.5">
+        <input
+          type="checkbox"
+          name={name}
+          checked={checked}
+          onChange={(e) => setChecked(e.target.checked)}
+          className="sr-only"
+        />
+        <button
+          type="button"
+          role="switch"
+          aria-checked={checked}
+          onClick={() => setChecked((c) => !c)}
+          className={cn(
+            "relative h-6 w-11 rounded-full transition",
+            checked ? "bg-accent" : "bg-paper-deep"
+          )}
+        >
+          <span
+            className={cn(
+              "absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform",
+              checked ? "translate-x-[22px]" : "translate-x-0.5"
+            )}
+          />
+        </button>
+      </span>
+    </label>
+  );
+}
+
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <Card>
@@ -230,6 +278,31 @@ export default function SettingsPanel({
           <span className="mb-1.5 block text-sm font-semibold text-ink">Phone</span>
           <input name="phone" defaultValue={truck.phone ?? ""} className={dashInput} />
         </label>
+      </Section>
+
+      <Section title="Privacy & contact visibility">
+        <p className="text-sm text-ink-soft">
+          Hidden by default. Turn these on to let customers reach you directly from your public
+          profile — nothing here shows until you switch it on.
+        </p>
+        <PrivacyToggle
+          name="show_phone"
+          defaultChecked={Boolean(truck.show_phone)}
+          label="Show phone number on public profile"
+          hint={`Adds a "Call" button using the phone number above.`}
+        />
+        <PrivacyToggle
+          name="show_email"
+          defaultChecked={Boolean(truck.show_email)}
+          label="Show email on public profile"
+          hint={`Adds a "Contact" button using your account email (${ownerEmail || "not set"}).`}
+        />
+        <PrivacyToggle
+          name="show_catering_contact"
+          defaultChecked={Boolean(truck.show_catering_contact)}
+          label="Show catering contact separately"
+          hint="Independent of the toggles above — controls only the phone/email shown in the Catering section."
+        />
       </Section>
 
       <Section title="Photos">

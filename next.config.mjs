@@ -1,5 +1,11 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  async redirects() {
+    return [
+      { source: "/privacy", destination: "/datenschutz", permanent: true },
+      { source: "/terms", destination: "/agb", permanent: true },
+    ];
+  },
   images: {
     remotePatterns: [
       {

@@ -104,6 +104,9 @@ export async function saveTruckAction(
     is_claimed: claimStatus === "claimed",
     source_region: String(formData.get("source_region") ?? "") || null,
     source_website: String(formData.get("source_website") ?? "") || null,
+    show_phone: formData.get("show_phone") === "on",
+    show_email: formData.get("show_email") === "on",
+    show_catering_contact: formData.get("show_catering_contact") === "on",
   };
 
   // Boost override (columns from migration 0007).

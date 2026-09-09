@@ -1,14 +1,19 @@
 import Link from "next/link";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
+import CookieSettingsButton from "./CookieSettingsButton";
 
 const LINKS = [
   { href: "/about", label: "About" },
   { href: "/events", label: "Events" },
   { href: "/catering", label: "Catering" },
-  { href: "/privacy", label: "Privacy Policy" },
-  { href: "/terms", label: "Terms" },
   { href: "/contact", label: "Contact" },
+];
+
+const LEGAL_LINKS = [
+  { href: "/agb", label: "AGB" },
+  { href: "/datenschutz", label: "Datenschutz" },
+  { href: "/cookies", label: "Cookies" },
 ];
 
 export default function Footer() {
@@ -62,9 +67,19 @@ export default function Footer() {
           </div>
         </div>
 
-        <p className="mt-8 border-t border-neutral-100 pt-6 text-xs text-neutral-400">
-          © 2026 FindMyTruck. All rights reserved.
-        </p>
+        <div className="mt-8 flex flex-col gap-3 border-t border-neutral-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs text-neutral-400">© 2026 FindMyTruck. All rights reserved.</p>
+          <nav className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-medium text-neutral-500">
+            {LEGAL_LINKS.map((link) => (
+              <Link key={link.href} href={link.href} className="transition hover:text-brand">
+                {link.label}
+              </Link>
+            ))}
+            <CookieSettingsButton className="transition hover:text-brand">
+              Cookie-Einstellungen
+            </CookieSettingsButton>
+          </nav>
+        </div>
       </div>
     </footer>
   );

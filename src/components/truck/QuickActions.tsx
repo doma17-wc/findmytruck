@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Globe, Music2, Navigation, Share2 } from "lucide-react";
+import { Check, Globe, Mail, Music2, Navigation, Phone, Share2 } from "lucide-react";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import FavoriteButton from "@/components/FavoriteButton";
 
@@ -16,6 +16,19 @@ interface QuickActionsProps {
   instagram?: string | null;
   tiktok?: string | null;
   website?: string | null;
+  /** Only present when the truck has switched the respective visibility toggle on. */
+  phone?: string | null;
+  email?: string | null;
+  truckName?: string;
+}
+
+function telHref(phone: string): string {
+  return `tel:${phone.replace(/[^\d+]/g, "")}`;
+}
+
+function mailtoHref(email: string, truckName: string): string {
+  const subject = encodeURIComponent(`Message for ${truckName}`);
+  return `mailto:${email}?subject=${subject}`;
 }
 
 function socialUrl(kind: "instagram" | "tiktok", handle: string): string {
@@ -42,6 +55,9 @@ export default function QuickActions({
   instagram,
   tiktok,
   website,
+  phone,
+  email,
+  truckName,
 }: QuickActionsProps) {
   const [copied, setCopied] = useState(false);
 
@@ -90,6 +106,26 @@ export default function QuickActions({
         >
           <Navigation className="h-4 w-4" />
           Directions
+        </a>
+      )}
+
+      {phone && (
+        <a
+          href={telHref(phone)}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-bold text-ink-soft transition hover:border-brand hover:text-brand"
+        >
+          <Phone className="h-4 w-4" />
+          Call
+        </a>
+      )}
+
+      {email && (
+        <a
+          href={mailtoHref(email, truckName ?? shareTitle)}
+          className="inline-flex items-center justify-center gap-2 rounded-xl border border-line bg-card px-4 py-2.5 text-sm font-bold text-ink-soft transition hover:border-brand hover:text-brand"
+        >
+          <Mail className="h-4 w-4" />
+          Email
         </a>
       )}
 

@@ -302,6 +302,46 @@ export default function TruckForm({ truck }: { truck?: Truck }) {
             Paused — keep all data but hide everywhere on the public site
           </span>
         </label>
+      </section>
+
+      {/* Contact privacy (migration 0017) -- all default OFF, owner-controlled
+          from their own dashboard too; admin can override here. */}
+      <section className="space-y-3 rounded-xl border border-line bg-card p-4">
+        <h3 className="font-display text-sm font-bold text-ink">Contact visibility</h3>
+        <p className="text-[13px] text-muted">
+          Hidden by default. Independent of the owner's own dashboard toggles — either can turn these on.
+        </p>
+        <label className="flex items-center gap-2.5">
+          <input
+            type="checkbox"
+            name="show_phone"
+            defaultChecked={Boolean(truck?.show_phone)}
+            className="h-5 w-5 rounded border-line text-accent focus:ring-accent"
+          />
+          <span className="text-sm font-medium text-ink-soft">Show phone number on public profile</span>
+        </label>
+        <label className="flex items-center gap-2.5">
+          <input
+            type="checkbox"
+            name="show_email"
+            defaultChecked={Boolean(truck?.show_email)}
+            className="h-5 w-5 rounded border-line text-accent focus:ring-accent"
+          />
+          <span className="text-sm font-medium text-ink-soft">Show email on public profile</span>
+        </label>
+        <label className="flex items-center gap-2.5">
+          <input
+            type="checkbox"
+            name="show_catering_contact"
+            defaultChecked={Boolean(truck?.show_catering_contact)}
+            className="h-5 w-5 rounded border-line text-accent focus:ring-accent"
+          />
+          <span className="text-sm font-medium text-ink-soft">Show catering contact separately</span>
+        </label>
+      </section>
+
+      <section className="space-y-3 rounded-xl border border-line bg-card p-4">
+        <h3 className="font-display text-sm font-bold text-ink">Boost</h3>
         <label className="flex items-center gap-2.5">
           <input
             type="checkbox"

@@ -96,6 +96,9 @@ export async function saveSettingsAction(
     payment_methods: csv("payment_methods"),
     features: csv("features"),
     is_active: formData.get("is_active") === "on",
+    show_phone: formData.get("show_phone") === "on",
+    show_email: formData.get("show_email") === "on",
+    show_catering_contact: formData.get("show_catering_contact") === "on",
   };
 
   const { error } = await supabase.from("trucks").update(payload).eq("id", truckId);

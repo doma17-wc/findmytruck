@@ -61,6 +61,16 @@ export interface PublicTruck {
   catering_photos?: unknown;
   catering_contact_email?: string | null;
   catering_contact_phone?: string | null;
+  /** Privacy controls (migration 0017) -- all default OFF. When a toggle is
+   *  off, the gated value below is already null (nulled out in the
+   *  public_trucks view itself, not just hidden by the app). */
+  show_phone?: boolean | null;
+  show_email?: boolean | null;
+  show_catering_contact?: boolean | null;
+  /** Truck's public phone -- present only when show_phone is true. */
+  phone?: string | null;
+  /** Truck's public contact email -- present only when show_email is true. */
+  email?: string | null;
 }
 
 export type ClaimStatus = "unclaimed" | "pending" | "claimed";

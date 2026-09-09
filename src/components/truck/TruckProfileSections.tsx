@@ -133,6 +133,9 @@ export default function TruckProfileSections({
         instagram={truck.instagram}
         tiktok={truck.tiktok}
         website={websiteUrl}
+        phone={truck.phone}
+        email={truck.email}
+        truckName={truck.name}
       />
 
       {/* Where are they */}
