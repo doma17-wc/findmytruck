@@ -197,6 +197,7 @@ export default async function DashboardPage({
       boostStartedAt={boost.startedAt ? boost.startedAt.toISOString() : null}
       stats={stats}
       ownerName={auth.profile?.display_name ?? null}
+      ownerEmail={auth.user.email ?? ""}
     />
   );
 }

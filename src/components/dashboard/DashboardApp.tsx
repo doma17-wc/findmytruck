@@ -55,6 +55,7 @@ interface Props {
   boostStartedAt: string | null;
   stats: DashboardStats;
   ownerName: string | null;
+  ownerEmail: string;
 }
 
 type PanelKey =
@@ -240,7 +241,13 @@ export default function DashboardApp(props: Props) {
               {active === "reviews" && <ReviewsPanel truckId={truck.id} reviews={props.reviews} />}
               {active === "insights" && <InsightsPanel stats={props.stats} />}
               {active === "settings" && (
-                <SettingsPanel truckId={truck.id} truck={truck} photos={props.photos} />
+                <SettingsPanel
+                  truckId={truck.id}
+                  truck={truck}
+                  photos={props.photos}
+                  ownedTrucks={props.ownedTrucks}
+                  ownerEmail={props.ownerEmail}
+                />
               )}
             </div>
           </main>

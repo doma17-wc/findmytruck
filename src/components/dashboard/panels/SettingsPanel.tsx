@@ -24,9 +24,11 @@ import {
   setCoverOwnPhotoAction,
   type ActionResult,
 } from "@/app/dashboard/actions";
+import type { OwnedTruckLite } from "@/lib/dashboardTruck";
 import { Card, CardBody, useToast, cn, dashInput } from "../ui";
 import ImageDropzone from "../ImageDropzone";
 import PhotoGalleryManager from "@/components/shared/PhotoGalleryManager";
+import OwnerAccountPanel from "./OwnerAccountPanel";
 
 async function uploadGalleryPhoto(truckId: string, file: File): Promise<string> {
   const supabase = createClient();
@@ -115,10 +117,14 @@ export default function SettingsPanel({
   truckId,
   truck,
   photos,
+  ownedTrucks,
+  ownerEmail,
 }: {
   truckId: string;
   truck: Truck;
   photos: TruckPhoto[];
+  ownedTrucks: OwnedTruckLite[];
+  ownerEmail: string;
 }) {
   const toast = useToast();
   const [state, formAction] = useFormState<ActionResult, FormData>(
@@ -140,6 +146,7 @@ export default function SettingsPanel({
   }, [state, toast]);
 
   return (
+    <div className="space-y-5">
     <form action={formAction} className="space-y-5">
       <Section title="Profile">
         <label className="block">
@@ -265,5 +272,18 @@ export default function SettingsPanel({
 
       <SaveBar />
     </form>
+
+    <div className="border-t border-line pt-6">
+      <h2 className="mb-1 font-display text-lg font-extrabold text-ink">Account</h2>
+      <p className="mb-4 text-sm text-muted">Pause your truck, change your password, or close your account.</p>
+      <OwnerAccountPanel
+        truckId={truckId}
+        truckName={truck.name}
+        paused={Boolean(truck.paused)}
+        ownedTrucks={ownedTrucks}
+        ownerEmail={ownerEmail}
+      />
+    </div>
+    </div>
   );
 }

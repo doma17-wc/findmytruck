@@ -1,6 +1,12 @@
 import type { TruckWithSchedules } from "@/lib/data";
 import type { EventWithTrucks, TruckSchedule } from "@/lib/types";
-import { computeTruckStatus, computeTruckDayPlan, readBoost, type TruckStatus } from "@/lib/geo";
+import {
+  computeTruckStatus,
+  computeTruckDayPlan,
+  readBoost,
+  type DayPlanSlot,
+  type TruckStatus,
+} from "@/lib/geo";
 import { dateStr, isEventOngoing } from "@/lib/events";
 import { regionFallbackStatus } from "@/lib/unclaimed";
 import type { DayPlan, DiscoverEntry, TruckRating } from "./types";
@@ -49,11 +55,26 @@ export function buildEntries(
     .filter((e): e is DiscoverEntry => e !== null);
 }
 
+const plannedStatus = (schedule: TruckSchedule | null): TruckStatus => ({
+  tier: "open",
+  label: "Planned",
+  detail: null,
+  schedule,
+  openUntil: null,
+  boostedAt: null,
+  next: null,
+});
+
 /**
  * Entries for a specific planned day (not "Today"). A truck shows up when it has
  * a schedule slot that day (weekly tour, honouring alternate/monthly frequency)
  * OR an event covering that date. Live open/boosted status is not computed —
  * each entry carries a `dayPlan` with the planned hours instead.
+ *
+ * A truck that visits more than one *location* that day (e.g. lunch at Bellevue,
+ * dinner at Oerlikon) yields one entry — and therefore one map pin / list card —
+ * per distinct location. Split shifts at the same spot stay a single entry with
+ * both time ranges.
  */
 export function buildDayEntries(
   trucks: TruckWithSchedules[],
@@ -62,66 +83,79 @@ export function buildDayEntries(
   eventsByTruck: Record<string, EventWithTrucks[]> = {}
 ): DiscoverEntry[] {
   const iso = dateStr(targetDate);
+  const out: DiscoverEntry[] = [];
 
-  return trucks
-    .map(({ truck, schedules }): DiscoverEntry | null => {
-      const events = eventsByTruck[truck.id] ?? [];
-      const dayEvent =
-        events.find((e) => e.start_date <= iso && iso <= e.end_date) ?? null;
-      const plan = computeTruckDayPlan(schedules, targetDate);
+  for (const { truck, schedules } of trucks) {
+    const events = eventsByTruck[truck.id] ?? [];
+    const dayEvent = events.find((e) => e.start_date <= iso && iso <= e.end_date) ?? null;
+    const plan = computeTruckDayPlan(schedules, targetDate);
 
-      if (!dayEvent && !plan) return null;
+    if (!dayEvent && !plan) continue;
 
-      let coord: [number, number];
-      let dayPlan: DayPlan;
-      let pinSchedule: TruckSchedule | null;
+    const rating = ratings[truck.id] ?? null;
 
-      if (dayEvent) {
-        coord = [dayEvent.location_lng, dayEvent.location_lat];
-        dayPlan = {
+    // An event covering the day takes the pin (it's the "headline" appearance).
+    if (dayEvent) {
+      out.push({
+        truck,
+        entryKey: truck.id,
+        status: plannedStatus(plan?.primary.schedule ?? null),
+        schedules,
+        coord: [dayEvent.location_lng, dayEvent.location_lat],
+        rating,
+        events,
+        activeEvent: dayEvent,
+        dayPlan: {
           date: targetDate,
           start: (dayEvent.start_time ?? plan?.primary.start ?? "").slice(0, 5),
           end: (dayEvent.end_time ?? plan?.primary.end ?? "").slice(0, 5),
           locationName: dayEvent.location_name,
           fromEvent: true,
           eventId: dayEvent.id,
-        };
-        pinSchedule = plan?.primary.schedule ?? null;
-      } else {
-        const primary = plan!.primary;
-        coord = [primary.schedule.location_lng, primary.schedule.location_lat];
-        dayPlan = {
-          date: targetDate,
-          start: primary.start,
-          end: primary.end,
-          locationName: primary.schedule.location_name,
-          fromEvent: false,
-        };
-        pinSchedule = primary.schedule;
-      }
+        },
+      });
+      continue;
+    }
 
-      const status: TruckStatus = {
-        tier: "open",
-        label: "Planned",
-        detail: null,
-        schedule: pinSchedule,
-        openUntil: null,
-        boostedAt: null,
-        next: null,
+    // Group this day's slots by location -> one entry per distinct spot.
+    const groups = new Map<string, DayPlanSlot[]>();
+    for (const s of plan!.all) {
+      const key = `${s.schedule.location_lat.toFixed(4)},${s.schedule.location_lng.toFixed(4)}`;
+      const g = groups.get(key);
+      if (g) g.push(s);
+      else groups.set(key, [s]);
+    }
+
+    const multi = groups.size > 1;
+    let i = 0;
+    for (const slots of groups.values()) {
+      const first = slots[0];
+      const last = slots[slots.length - 1];
+      const dayPlan: DayPlan = {
+        date: targetDate,
+        start: first.start,
+        end: last.end,
+        slotsLabel:
+          slots.length > 1 ? slots.map((s) => `${s.start}–${s.end}`).join(" · ") : undefined,
+        locationName: first.schedule.location_name,
+        fromEvent: false,
       };
-
-      return {
+      out.push({
         truck,
-        status,
+        entryKey: multi ? `${truck.id}__${i}` : truck.id,
+        status: plannedStatus(first.schedule),
         schedules,
-        coord,
-        rating: ratings[truck.id] ?? null,
+        coord: [first.schedule.location_lng, first.schedule.location_lat],
+        rating,
         events,
-        activeEvent: dayEvent,
+        activeEvent: null,
         dayPlan,
-      };
-    })
-    .filter((e): e is DiscoverEntry => e !== null);
+      });
+      i += 1;
+    }
+  }
+
+  return out;
 }
 
 /**

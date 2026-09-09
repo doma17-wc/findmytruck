@@ -95,7 +95,7 @@ export function DayPlanBadge({
 }) {
   const { lang } = useLang();
   const day = weekdayName(plan.date, lang, "short");
-  const range = rangeLabel(plan.start, plan.end);
+  const range = plan.slotsLabel ?? rangeLabel(plan.start, plan.end);
   return (
     <span
       className={`inline-flex items-center gap-1.5 rounded-full bg-green-100 px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide text-green-700 ring-1 ring-inset ring-green-500/25 ${className}`}

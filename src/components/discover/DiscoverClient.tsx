@@ -28,7 +28,11 @@ import TruckCard from "./TruckCard";
 import DetailSheet from "./DetailSheet";
 import BrowseAll from "./BrowseAll";
 import { buildDayEntries, buildEntries, CUISINE_CHIPS, matchesCuisine } from "./helpers";
-import type { SortKey, TruckRating } from "./types";
+import type { DiscoverEntry, SortKey, TruckRating } from "./types";
+
+/** Identity of an entry for list keys / map markers / selection. One truck can
+ *  produce several entries on a planned day (one per location it visits). */
+const keyOf = (e: DiscoverEntry) => e.entryKey ?? e.truck.id;
 import type { TruckTier } from "@/lib/geo";
 import { useGeolocation } from "./useGeolocation";
 import type { AppProfile } from "@/lib/supabase/server";
@@ -206,7 +210,7 @@ function DiscoverClientInner({
     ? allEntries.filter((e) => e.status.tier === "boosted").length
     : 0;
   const selectedEntry = selectedId
-    ? allEntries.find((e) => e.truck.id === selectedId) ?? null
+    ? allEntries.find((e) => keyOf(e) === selectedId) ?? null
     : null;
 
   // Scroll the selected card into view (e.g. after a map pin click)
@@ -435,23 +439,26 @@ function DiscoverClientInner({
                     : t("noTrucksDay", { day: viewDayLabel })}
                 </p>
               ) : (
-                sorted.map(({ entry, dist }) => (
-                  <TruckCard
-                    key={entry.truck.id}
-                    entry={entry}
-                    signedIn={signedIn}
-                    favorited={favoritedSet.has(entry.truck.id)}
-                    selected={selectedId === entry.truck.id}
-                    distanceKm={userLocation ? dist : null}
-                    isOwnerView={ownedTruckIds.has(entry.truck.id)}
-                    onSelect={() => setSelectedId(entry.truck.id)}
-                    onHover={(h) => setHoveredId(h ? entry.truck.id : null)}
-                    ref={(el) => {
-                      if (el) cardRefs.current.set(entry.truck.id, el);
-                      else cardRefs.current.delete(entry.truck.id);
-                    }}
-                  />
-                ))
+                sorted.map(({ entry, dist }) => {
+                  const k = keyOf(entry);
+                  return (
+                    <TruckCard
+                      key={k}
+                      entry={entry}
+                      signedIn={signedIn}
+                      favorited={favoritedSet.has(entry.truck.id)}
+                      selected={selectedId === k}
+                      distanceKm={userLocation ? dist : null}
+                      isOwnerView={ownedTruckIds.has(entry.truck.id)}
+                      onSelect={() => setSelectedId(k)}
+                      onHover={(h) => setHoveredId(h ? k : null)}
+                      ref={(el) => {
+                        if (el) cardRefs.current.set(k, el);
+                        else cardRefs.current.delete(k);
+                      }}
+                    />
+                  );
+                })
               )}
             </div>
           </div>

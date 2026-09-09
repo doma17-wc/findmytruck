@@ -42,6 +42,9 @@ export interface AppProfile {
   notify_follow_live?: boolean | null;
   /** Opaque token for one-click e-mail unsubscribe (migration 0013). */
   notify_token?: string | null;
+  /** Customer "pause account" switch (migration 0015). Defaults to false.
+   *  While true the account is excluded from the follow/live fan-out. */
+  deactivated?: boolean | null;
 }
 
 /** Current signed-in user + their profile row + every truck id they own

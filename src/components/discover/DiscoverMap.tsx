@@ -10,6 +10,10 @@ import type { DiscoverEntry } from "./types";
 
 mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN!;
 
+/** Marker / selection identity. One truck can own several pins on a planned day
+ *  (one per location it visits) — each entry then carries its own `entryKey`. */
+const keyOf = (e: DiscoverEntry) => e.entryKey ?? e.truck.id;
+
 /**
  * Bounding box around the bulk of the pins, ignoring far outliers so the initial
  * camera frames the main cluster instead of zooming out to the whole country.
@@ -168,7 +172,7 @@ export default function DiscoverMap({
     const map = mapRef.current;
     if (!map) return;
 
-    const nextIds = new Set(entries.map((e) => e.truck.id));
+    const nextIds = new Set(entries.map(keyOf));
     for (const [id, marker] of markersRef.current) {
       if (!nextIds.has(id)) {
         marker.remove();
@@ -181,6 +185,7 @@ export default function DiscoverMap({
 
     entries.forEach((entry) => {
       const { truck, status, coord, activeEvent } = entry;
+      const id = keyOf(entry);
       const unclaimed = isUnclaimed(truck);
       const boosted = status.tier === "boosted";
       const meta: PinMeta = {
@@ -191,9 +196,9 @@ export default function DiscoverMap({
         iconOpacity: unclaimed ? "0.55" : "1",
         hasEvent: Boolean(activeEvent),
       };
-      metaRef.current.set(truck.id, meta);
+      metaRef.current.set(id, meta);
 
-      let marker = markersRef.current.get(truck.id);
+      let marker = markersRef.current.get(id);
       if (!marker) {
         // Mapbox owns `wrapper`: it sets positioning classes + a per-frame
         // `transform` on it. All of our styling goes on the inner button.
@@ -207,9 +212,9 @@ export default function DiscoverMap({
         el.appendChild(inner);
         el.addEventListener("click", (e) => {
           e.stopPropagation();
-          onSelect(truck.id);
+          onSelect(id);
         });
-        el.addEventListener("mouseenter", () => onHover(truck.id));
+        el.addEventListener("mouseenter", () => onHover(id));
         el.addEventListener("mouseleave", () => onHover(null));
         wrapper.appendChild(el);
 
@@ -218,15 +223,15 @@ export default function DiscoverMap({
         badge.textContent = "🎪";
         badge.hidden = true;
         wrapper.appendChild(badge);
-        badgeElsRef.current.set(truck.id, badge);
+        badgeElsRef.current.set(id, badge);
 
         marker = new mapboxgl.Marker({ element: wrapper }).setLngLat(coord).addTo(map);
-        markersRef.current.set(truck.id, marker);
-        pinElsRef.current.set(truck.id, el);
+        markersRef.current.set(id, marker);
+        pinElsRef.current.set(id, el);
       } else {
         marker.setLngLat(coord);
       }
-      applyPinStyle(truck.id);
+      applyPinStyle(id);
     });
 
     // Frame trucks on first load (only when the user has no location). Fit to the

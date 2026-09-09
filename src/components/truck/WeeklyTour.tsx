@@ -23,35 +23,48 @@ export default function WeeklyTour({
   highlightLabel = "Today",
   openUntil,
 }: WeeklyTourProps) {
-  const { groups, todayGroup, closedLabel } = summarizeWeeklyTour(schedules, highlightDay);
+  const { groups, closedLabel } = summarizeWeeklyTour(schedules, highlightDay);
   if (groups.length === 0) return null;
 
   const live = Boolean(openUntil);
+  // A day can carry more than one stop (split service — lunch here, dinner
+  // there): show every group that covers the highlighted day.
+  const todayGroups = groups.filter((g) => g.containsToday);
 
   return (
     <div className="mt-2 space-y-2">
-      {/* At-a-glance line for the highlighted day */}
+      {/* At-a-glance line(s) for the highlighted day */}
       <div
         className={`flex items-start gap-2.5 rounded-2xl border px-3.5 py-3 ${
-          todayGroup && live
+          todayGroups.length && live
             ? "border-green-500/25 bg-green-50"
-            : todayGroup
+            : todayGroups.length
             ? "border-brand-200 bg-brand-50/60"
             : "border-line bg-card"
         }`}
       >
         <CalendarClock
-          className={`mt-0.5 h-4 w-4 flex-shrink-0 ${todayGroup ? "text-brand" : "text-muted"}`}
+          className={`mt-0.5 h-4 w-4 flex-shrink-0 ${
+            todayGroups.length ? "text-brand" : "text-muted"
+          }`}
         />
-        {todayGroup ? (
-          <p className="text-[13px] leading-snug text-ink">
-            <span className={`font-bold ${live ? "text-live" : "text-brand"}`}>{highlightLabel}</span>
-            {" · "}
-            <span className="font-semibold">{todayGroup.locationName}</span>
-            {" · "}
-            <span className="font-mono text-ink-soft">{todayGroup.timeLabel}</span>
-            {live && <span className="font-semibold text-live"> · open until {openUntil}</span>}
-          </p>
+        {todayGroups.length ? (
+          <div className="space-y-0.5">
+            {todayGroups.map((g, i) => (
+              <p key={i} className="text-[13px] leading-snug text-ink">
+                <span className={`font-bold ${live ? "text-live" : "text-brand"}`}>
+                  {i === 0 ? highlightLabel : "·"}
+                </span>
+                {" · "}
+                <span className="font-semibold">{g.locationName}</span>
+                {" · "}
+                <span className="font-mono text-ink-soft">{g.timeLabel}</span>
+                {i === 0 && live && (
+                  <span className="font-semibold text-live"> · open until {openUntil}</span>
+                )}
+              </p>
+            ))}
+          </div>
         ) : (
           <p className="text-[13px] leading-snug text-ink-soft">
             <span className="font-bold text-ink">{highlightLabel}</span> · not on the weekly tour

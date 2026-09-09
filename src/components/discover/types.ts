@@ -12,9 +12,13 @@ export interface TruckRating {
 export interface DayPlan {
   /** The calendar date being viewed. */
   date: Date;
-  /** "HH:MM" – "HH:MM" for that day. */
+  /** "HH:MM" – "HH:MM" spanning that day's service at this location (first
+   *  start … last end). */
   start: string;
   end: string;
+  /** Precise label when the truck runs more than one slot at this location that
+   *  day, e.g. "11:30–14:00 · 18:00–21:00". Falls back to `start–end`. */
+  slotsLabel?: string;
   locationName: string;
   /** True when the appearance comes from an event rather than the weekly tour. */
   fromEvent: boolean;
@@ -25,6 +29,11 @@ export interface DayPlan {
 /** One row in the discovery list + its matching map pin. */
 export interface DiscoverEntry {
   truck: PublicTruck;
+  /** Identity of this entry for list keys / map markers / selection. Defaults
+   *  to `truck.id`; set explicitly (e.g. `${truck.id}__0`) when one truck
+   *  produces several entries — a planned day where it visits more than one
+   *  location. */
+  entryKey?: string;
   /** Three-tier status (boosted / open / closed) — the single source of truth. */
   status: TruckStatus;
   /** Full weekly schedule for the detail sheet. */

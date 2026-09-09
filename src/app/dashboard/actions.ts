@@ -99,6 +99,24 @@ export async function saveSettingsAction(
   return { success: true };
 }
 
+/** Self-service pause: hide one of the owner's trucks from every public surface
+ *  (map / list / browse / search / profile page) without deleting anything.
+ *  Reuses `trucks.paused` (migration 0008) — the owner UPDATE RLS from 0014
+ *  already scopes this to trucks they own. */
+export async function setOwnTruckPausedAction(
+  truckId: string,
+  paused: boolean
+): Promise<ActionResult> {
+  await requireOwnedTruckId(truckId);
+  const supabase = createClient();
+
+  const { error } = await supabase.from("trucks").update({ paused }).eq("id", truckId);
+  if (error) return { error: error.message };
+
+  revalidateEverywhere();
+  return { success: true };
+}
+
 /* ------------------------------------------------------------------ *
  * MENU  (inline editor -> trucks.menu_items jsonb)
  * ------------------------------------------------------------------ */
@@ -123,16 +141,18 @@ export async function saveMenuAction(truckId: string, items: unknown): Promise<A
  * TOUR SCHEDULE  (7-day form -> truck_schedules, geocoded server-side)
  * ------------------------------------------------------------------ */
 
-export interface TourDayInput {
+/** One stop in the weekly tour. A day can carry any number of these (split
+ *  services — e.g. Wed lunch at Bellevue AND Wed dinner at Oerlikon), each with
+ *  its own location, hours and frequency. */
+export interface TourSlotInput {
   day: number; // 0 = Mon .. 6 = Sun
   location: string;
   startTime: string; // "HH:MM"
   endTime: string; // "HH:MM"
-  open: boolean;
   /** Coordinates already known for this location (skip re-geocoding). */
   lat: number | null;
   lng: number | null;
-  /** How often this day repeats. Defaults to "weekly" (every week, unchanged). */
+  /** How often this stop repeats. Defaults to "weekly" (every week, unchanged). */
   frequency: ScheduleFrequency;
   /** Only used when frequency = "alternate". */
   frequencyParity: "even" | "odd" | null;
@@ -151,7 +171,7 @@ function clampTime(raw: string, fallback: string): string {
 
 export async function publishTourAction(
   truckId: string,
-  days: TourDayInput[]
+  slots: TourSlotInput[]
 ): Promise<ActionResult> {
   await requireOwnedTruckId(truckId);
   const supabase = createClient();
@@ -170,9 +190,9 @@ export async function publishTourAction(
     frequency_weeks: number[] | null;
   }[] = [];
 
-  for (const d of days) {
+  for (const d of slots) {
     const location = (d.location ?? "").trim();
-    if (!d.open || !location) continue;
+    if (!location) continue;
 
     let lat = typeof d.lat === "number" && Number.isFinite(d.lat) ? d.lat : null;
     let lng = typeof d.lng === "number" && Number.isFinite(d.lng) ? d.lng : null;

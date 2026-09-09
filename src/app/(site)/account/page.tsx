@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Bell, CalendarDays, LayoutDashboard, Heart, LogOut, MapPin, Zap } from "lucide-react";
+import { Bell, CalendarDays, KeyRound, LayoutDashboard, Heart, LogOut, MapPin, Zap } from "lucide-react";
 import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
 import { dateStr } from "@/lib/events";
 import { formatEventDateRange } from "@/lib/eventFormat";
 import type { Notification } from "@/lib/types";
 import NotifyPreferenceToggle from "@/components/notifications/NotifyPreferenceToggle";
+import ChangePasswordForm from "@/components/account/ChangePasswordForm";
+import PauseAccountSection from "@/components/account/PauseAccountSection";
+import DeleteAccountSection from "@/components/account/DeleteAccountSection";
 import { signOutAction } from "../auth-actions";
 
 export const metadata = { title: "Your profile" };
@@ -60,6 +63,7 @@ export default async function AccountPage() {
   }
 
   const notifyOn = profile?.notify_follow_live ?? true;
+  const paused = Boolean(profile?.deactivated);
 
   return (
     <div className="mx-auto max-w-md px-4 py-10">
@@ -116,7 +120,14 @@ export default async function AccountPage() {
         </div>
       </div>
 
-      {!isOwner && (
+      {!isOwner && paused && (
+        <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+          Your account is paused — we&apos;ve stopped all notifications and e-mails. Your follows
+          and reviews are safe. Reactivate below any time.
+        </div>
+      )}
+
+      {!isOwner && !paused && (
         <div className="mt-6 rounded-2xl border border-neutral-100 bg-white p-6 shadow-card">
           <h2 className="flex items-center gap-2 text-sm font-bold text-neutral-900">
             <Bell className="h-[18px] w-[18px] text-brand" />
@@ -174,7 +185,7 @@ export default async function AccountPage() {
         </div>
       )}
 
-      {!isOwner && (
+      {!isOwner && !paused && (
         <div className="mt-6 rounded-2xl border border-neutral-100 bg-white p-6 shadow-card">
           <h2 className="flex items-center gap-2 text-sm font-bold text-neutral-900">
             <CalendarDays className="h-[18px] w-[18px] text-brand" />
@@ -224,6 +235,26 @@ export default async function AccountPage() {
           )}
         </div>
       )}
+
+      {!isOwner && (
+        <div className="mt-6">
+          <PauseAccountSection initialPaused={paused} />
+        </div>
+      )}
+
+      <div className="mt-6 rounded-2xl border border-neutral-100 bg-white p-6 shadow-card">
+        <h2 className="flex items-center gap-2 text-sm font-bold text-neutral-900">
+          <KeyRound className="h-[18px] w-[18px] text-brand" />
+          Change password
+        </h2>
+        <div className="mt-4">
+          <ChangePasswordForm email={user.email ?? ""} />
+        </div>
+      </div>
+
+      <div className="mt-6">
+        <DeleteAccountSection role={isOwner ? "truck_owner" : "customer"} />
+      </div>
     </div>
   );
 }
