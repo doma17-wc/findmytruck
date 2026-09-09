@@ -2,6 +2,7 @@ import Link from "next/link";
 import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import CookieSettingsButton from "./CookieSettingsButton";
+import { COMPANY } from "@/lib/legalContent";
 
 const LINKS = [
   { href: "/about", label: "About" },
@@ -30,13 +31,12 @@ export default function Footer() {
                 Find<span className="text-brand">My</span>Truck
               </span>
             </Link>
-            <p className="mt-3 text-sm text-neutral-500">A product by Paolino Grand Cru GmbH</p>
-            <p className="mt-1 text-sm text-neutral-500">Wolserstrasse, 8912 Obfelden, Switzerland</p>
-            <p className="mt-1 text-sm text-neutral-500">CHE-358.850.974</p>
+            <p className="mt-3 text-sm text-neutral-500">A product by {COMPANY.name}</p>
+            <p className="mt-1 text-sm text-neutral-500">{COMPANY.address}</p>
             <p className="mt-1 text-sm text-neutral-500">
               Contact:{" "}
-              <a href="mailto:info@findmytruck.ch" className="font-medium text-neutral-700 hover:text-brand">
-                info@findmytruck.ch
+              <a href={`mailto:${COMPANY.email}`} className="font-medium text-neutral-700 hover:text-brand">
+                {COMPANY.email}
               </a>
             </p>
           </div>

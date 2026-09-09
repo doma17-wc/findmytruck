@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import ContactForm from "@/components/site/ContactForm";
+import { COMPANY } from "@/lib/legalContent";
 
 export const metadata: Metadata = { title: "Contact" };
 
@@ -19,16 +20,15 @@ export default function ContactPage() {
       </div>
 
       <div className="mt-8 border-t border-neutral-100 pt-6 text-[15px] text-neutral-600">
-        <p className="font-semibold text-neutral-800">Paolino Grand Cru GmbH</p>
-        <p className="mt-1">Wolserstrasse, 8912 Obfelden, Switzerland</p>
-        <p>CHE-358.850.974</p>
+        <p className="font-semibold text-neutral-800">{COMPANY.name}</p>
+        <p className="mt-1">{COMPANY.address}</p>
         <p className="pt-2">
           Email:{" "}
           <a
-            href="mailto:info@findmytruck.ch"
+            href={`mailto:${COMPANY.email}`}
             className="font-medium text-brand hover:underline"
           >
-            info@findmytruck.ch
+            {COMPANY.email}
           </a>
         </p>
       </div>
