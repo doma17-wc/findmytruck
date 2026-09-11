@@ -8,6 +8,7 @@ import { getServiceSupabase } from "@/lib/supabase/admin";
 import { normalizeMenuItems } from "@/lib/menu";
 import { setAppSetting } from "@/lib/settings";
 import { ADMIN_COOKIE, hashAdminPassword } from "@/lib/adminAuth";
+import type { EventTruckStatus } from "@/lib/types";
 
 // ---------- Auth ----------
 
@@ -397,6 +398,10 @@ export async function deleteScheduleAction(truckId: string, scheduleId: string) 
 // A "general" event (no single created_by_truck_id) can have many trucks
 // linked via event_trucks -- e.g. a street food festival. A per-truck event
 // created from that truck's admin page auto-links to just that truck.
+//
+// Writes to `events` / `event_trucks` require the service-role key -- the
+// anon-write policies these used to rely on have been removed (see migration
+// 0019_lock_down_events_rls.sql), same as trucks in migration 0018.
 
 export interface EventFormResult {
   error?: string;
@@ -410,10 +415,15 @@ function revalidateEvents(truckId?: string | null) {
   if (truckId) revalidatePath(`/admin/trucks/${truckId}`);
 }
 
+const noServiceRole = { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to manage events." };
+
 export async function saveEventAction(
   eventId: string | null,
   formData: FormData
 ): Promise<EventFormResult> {
+  const service = getServiceSupabase();
+  if (!service) return noServiceRole;
+
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Name is required." };
   const startDate = String(formData.get("start_date") ?? "");
@@ -446,13 +456,13 @@ export async function saveEventAction(
   };
 
   if (eventId) {
-    const { error } = await supabase.from("events").update(payload).eq("id", eventId);
+    const { error } = await service.from("events").update(payload).eq("id", eventId);
     if (error) return { error: error.message };
     revalidateEvents(createdByTruckId);
     return { id: eventId };
   }
 
-  const { data, error } = await supabase.from("events").insert(payload).select("id").single();
+  const { data, error } = await service.from("events").insert(payload).select("id").single();
   if (error) return { error: error.message };
 
   // Comma-separated truck ids to link immediately on create (the calling
@@ -462,7 +472,7 @@ export async function saveEventAction(
     .map((s) => s.trim())
     .filter(Boolean);
   if (truckIds.length > 0) {
-    await supabase
+    await service
       .from("event_trucks")
       .insert(truckIds.map((truck_id) => ({ event_id: data.id, truck_id, status: "confirmed" })));
   }
@@ -471,21 +481,53 @@ export async function saveEventAction(
   return { id: data.id };
 }
 
-/** Replace the full set of trucks linked to an event -- used by the general
- * multi-truck picker in the admin Events tab. */
-export async function setEventTrucksAction(eventId: string, truckIds: string[]) {
-  await supabase.from("event_trucks").delete().eq("event_id", eventId);
-  if (truckIds.length > 0) {
-    await supabase
-      .from("event_trucks")
-      .insert(truckIds.map((truck_id) => ({ event_id: eventId, truck_id, status: "confirmed" })));
-  }
+/** Add a truck to an event, or change its invite/confirm/decline status if
+ * already linked -- used by the admin Events tab's collaborator manager. */
+export async function setEventTruckStatusAction(
+  eventId: string,
+  truckId: string,
+  status: EventTruckStatus
+): Promise<EventFormResult> {
+  const service = getServiceSupabase();
+  if (!service) return noServiceRole;
+
+  const { error } = await service
+    .from("event_trucks")
+    .upsert({ event_id: eventId, truck_id: truckId, status }, { onConflict: "event_id,truck_id" });
+  if (error) return { error: error.message };
   revalidateEvents();
+  return {};
 }
 
-export async function deleteEventAction(eventId: string, truckId?: string | null) {
-  await supabase.from("events").delete().eq("id", eventId);
+/** Unlink a truck from an event entirely. */
+export async function removeEventTruckAction(
+  eventId: string,
+  truckId: string
+): Promise<EventFormResult> {
+  const service = getServiceSupabase();
+  if (!service) return noServiceRole;
+
+  const { error } = await service
+    .from("event_trucks")
+    .delete()
+    .eq("event_id", eventId)
+    .eq("truck_id", truckId);
+  if (error) return { error: error.message };
+  revalidateEvents();
+  return {};
+}
+
+export async function deleteEventAction(
+  eventId: string,
+  truckId?: string | null
+): Promise<EventFormResult> {
+  const service = getServiceSupabase();
+  if (!service) return noServiceRole;
+
+  const { error } = await service.from("events").delete().eq("id", eventId);
+  if (error) return { error: error.message };
   revalidateEvents(truckId);
+  return {};
 }
 
 // ---------- Photos ----------

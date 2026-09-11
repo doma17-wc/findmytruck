@@ -1,5 +1,7 @@
 import { supabase } from "./supabase";
 import type {
+  AdminEvent,
+  AdminEventLink,
   DashboardEvent,
   EventCollaborator,
   EventTruckRef,
@@ -119,6 +121,48 @@ export async function getAllUpcomingEvents(): Promise<EventWithTrucks[]> {
     .order("start_date", { ascending: true });
   if (error || !data) return [];
   return sortByStartDate(await attachExtras(data as FmtEvent[]));
+}
+
+/** Every event (past + upcoming), with every truck link at any status -- the
+ *  admin Events tab needs the full picture, not just what's public. */
+export async function getAllEventsForAdmin(): Promise<AdminEvent[]> {
+  const { data, error } = await supabase
+    .from("events")
+    .select("*")
+    .order("start_date", { ascending: false });
+  if (error || !data) return [];
+  const events = (data as FmtEvent[]).map(normalizeEvent);
+  if (events.length === 0) return [];
+  const eventIds = events.map((e) => e.id);
+
+  const [{ data: links }, { data: counts }] = await Promise.all([
+    supabase.from("event_trucks").select("event_id, truck_id, status").in("event_id", eventIds),
+    supabase.from("event_rsvp_counts").select("event_id, interested_count").in("event_id", eventIds),
+  ]);
+
+  const linksByEvent = new Map<string, AdminEventLink[]>();
+  for (const l of (links ?? []) as {
+    event_id: string;
+    truck_id: string;
+    status: EventTruckStatus | null;
+  }[]) {
+    const list = linksByEvent.get(l.event_id) ?? [];
+    list.push({ truck_id: l.truck_id, status: l.status ?? "confirmed" });
+    linksByEvent.set(l.event_id, list);
+  }
+
+  const countByEvent = new Map(
+    ((counts ?? []) as { event_id: string; interested_count: number }[]).map((c) => [
+      c.event_id,
+      c.interested_count,
+    ])
+  );
+
+  return events.map((e) => ({
+    ...e,
+    truckLinks: linksByEvent.get(e.id) ?? [],
+    interestedCount: countByEvent.get(e.id) ?? 0,
+  }));
 }
 
 /** A single event by id, with confirmed trucks + interested count. */

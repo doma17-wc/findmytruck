@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { Truck, EventWithTrucks } from "@/lib/types";
+import type { Truck, AdminEvent } from "@/lib/types";
 import { logoutAction } from "@/app/admin/actions";
 import { cn, Card, Badge } from "./ui";
 import TrucksTab from "./TrucksTab";
@@ -50,7 +50,7 @@ export default function AdminApp({
 }: {
   trucks: AdminTruck[];
   users: AdminUser[] | null;
-  events: EventWithTrucks[];
+  events: AdminEvent[];
   hasServiceRole: boolean;
   reviewsRequireLogin: boolean;
 }) {
@@ -187,7 +187,7 @@ export default function AdminApp({
         {tab === "events" && (
           <AdminEventsTab
             events={events}
-            trucks={trucks.map((t) => ({ id: t.id, name: t.name }))}
+            trucks={trucks.map((t) => ({ id: t.id, name: t.name, slug: t.slug, logo_url: t.logo_url }))}
           />
         )}
         {tab === "users" && <UsersTab users={users} hasServiceRole={hasServiceRole} />}

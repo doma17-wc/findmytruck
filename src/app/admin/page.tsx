@@ -2,7 +2,7 @@ import { supabase } from "@/lib/supabase";
 import { getServiceSupabase } from "@/lib/supabase/admin";
 import { readBoost, isBoostActive } from "@/lib/geo";
 import type { Truck, QrRedirect } from "@/lib/types";
-import { getAllUpcomingEvents } from "@/lib/events";
+import { getAllEventsForAdmin } from "@/lib/events";
 import { getBooleanSetting } from "@/lib/settings";
 import AdminApp, { type AdminTruck, type AdminUser } from "@/components/admin/AdminApp";
 
@@ -57,7 +57,7 @@ export default async function AdminDashboardPage() {
       .from("truck_page_views")
       .select("truck_id")
       .gte("viewed_at", thirtyDaysAgo.toISOString()),
-    getAllUpcomingEvents(),
+    getAllEventsForAdmin(),
   ]);
 
   const reviewsRequireLogin = await getBooleanSetting("reviews_require_login", false);

@@ -1,10 +1,18 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { EventWithTrucks } from "@/lib/types";
-import { saveEventAction, setEventTrucksAction, deleteEventAction } from "@/app/admin/actions";
+import { CalendarDays, MapPin } from "lucide-react";
+import type { AdminEvent, EventTruckStatus } from "@/lib/types";
+import {
+  saveEventAction,
+  setEventTruckStatusAction,
+  removeEventTruckAction,
+  deleteEventAction,
+} from "@/app/admin/actions";
 import { EVENT_TYPE_OPTIONS, EVENT_TYPE_META, type EventType } from "@/lib/types";
-import { Card } from "./ui";
+import { formatEventDateRange, formatEventTime } from "@/lib/eventFormat";
+import EventTypeBadge from "@/components/shared/EventTypeBadge";
+import { cn, Card, ActionButton } from "./ui";
 import LocationSearch from "./LocationSearch";
 import TimePickerField from "@/components/shared/TimePickerField";
 import EventImageDropzone from "@/components/shared/EventImageDropzone";
@@ -15,6 +23,8 @@ const inputClass =
 export interface AdminEventTruckOption {
   id: string;
   name: string;
+  slug: string;
+  logo_url: string | null;
 }
 
 interface DraftEvent {
@@ -49,19 +59,21 @@ const emptyDraft: DraftEvent = {
   truckIds: [],
 };
 
-function formatDateRange(start: string, end: string): string {
-  const opts: Intl.DateTimeFormatOptions = { day: "numeric", month: "short", year: "numeric" };
-  const s = new Date(`${start}T00:00:00`).toLocaleDateString("en", opts);
-  if (start === end) return s;
-  const e = new Date(`${end}T00:00:00`).toLocaleDateString("en", opts);
-  return `${s} – ${e}`;
+function todayStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate()
+  ).padStart(2, "0")}`;
 }
+
+type DateFilter = "upcoming" | "past" | "all";
+type SortDir = "asc" | "desc";
 
 export default function AdminEventsTab({
   events,
   trucks,
 }: {
-  events: EventWithTrucks[];
+  events: AdminEvent[];
   trucks: AdminEventTruckOption[];
 }) {
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -70,17 +82,40 @@ export default function AdminEventsTab({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [truckFilter, setTruckFilter] = useState("");
+  const [addTruckId, setAddTruckId] = useState("");
 
+  const [dateFilter, setDateFilter] = useState<DateFilter>("upcoming");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [search, setSearch] = useState("");
+
+  const today = useMemo(() => todayStr(), []);
+  const truckById = useMemo(() => new Map(trucks.map((t) => [t.id, t])), [trucks]);
   const sortedTrucks = useMemo(() => [...trucks].sort((a, b) => a.name.localeCompare(b.name)), [trucks]);
   const filteredTrucks = useMemo(
     () => sortedTrucks.filter((t) => t.name.toLowerCase().includes(truckFilter.toLowerCase())),
     [sortedTrucks, truckFilter]
   );
 
-  const sortedEvents = useMemo(
-    () => [...events].sort((a, b) => (a.start_date < b.start_date ? -1 : 1)),
-    [events]
-  );
+  const visibleEvents = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    const filtered = events.filter((e) => {
+      const past = e.end_date < today;
+      if (dateFilter === "upcoming" && past) return false;
+      if (dateFilter === "past" && !past) return false;
+      if (needle) {
+        const hay = `${e.name} ${e.location_name}`.toLowerCase();
+        if (!hay.includes(needle)) return false;
+      }
+      return true;
+    });
+    filtered.sort((a, b) => (a.start_date < b.start_date ? -1 : a.start_date > b.start_date ? 1 : 0));
+    if (sortDir === "desc") filtered.reverse();
+    return filtered;
+  }, [events, dateFilter, search, sortDir, today]);
+
+  const editingEvent = editingId ? events.find((e) => e.id === editingId) ?? null : null;
+  const linkedTruckIds = new Set((editingEvent?.truckLinks ?? []).map((l) => l.truck_id));
+  const addableTrucks = sortedTrucks.filter((t) => !linkedTruckIds.has(t.id));
 
   const startNew = () => {
     setEditingId(null);
@@ -89,7 +124,7 @@ export default function AdminEventsTab({
     setShowForm(true);
   };
 
-  const startEdit = (e: EventWithTrucks) => {
+  const startEdit = (e: AdminEvent) => {
     setEditingId(e.id);
     setDraft({
       name: e.name,
@@ -104,8 +139,9 @@ export default function AdminEventsTab({
       link: e.link ?? "",
       image_url: e.image_url ?? null,
       event_type: e.event_type ?? "festival",
-      truckIds: e.trucks.map((t) => t.id),
+      truckIds: [],
     });
+    setAddTruckId("");
     setError(null);
     setShowForm(true);
   };
@@ -146,72 +182,70 @@ export default function AdminEventsTab({
     if (!editingId) fd.set("truck_ids", draft.truckIds.join(","));
 
     const res = await saveEventAction(editingId, fd);
+    setSubmitting(false);
     if (res.error) {
-      setSubmitting(false);
       setError(res.error);
       return;
     }
-    if (editingId) {
-      await setEventTrucksAction(editingId, draft.truckIds);
-    }
-    setSubmitting(false);
     cancel();
   };
 
   return (
     <div className="space-y-5">
-      <Card className="p-0">
-        {sortedEvents.length === 0 ? (
-          <div className="px-4 py-6 text-center text-sm text-neutral-400">No events yet</div>
-        ) : (
-          <div className="divide-y divide-neutral-100">
-            {sortedEvents.map((e) => (
-              <div key={e.id} className="flex items-start justify-between gap-3 px-4 py-3 text-sm">
-                <div className="min-w-0">
-                  <span className="font-semibold">{e.name}</span>
-                  <span className="text-neutral-400"> · </span>
-                  <span>{formatDateRange(e.start_date, e.end_date)}</span>
-                  <div className="mt-0.5 text-xs text-neutral-500">{e.location_name}</div>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {e.trucks.length === 0 ? (
-                      <span className="text-xs text-neutral-400">No trucks linked</span>
-                    ) : (
-                      e.trucks.map((t) => (
-                        <span
-                          key={t.id}
-                          className="rounded-full bg-neutral-100 px-2 py-0.5 text-[11px] font-semibold text-neutral-600"
-                        >
-                          {t.name}
-                        </span>
-                      ))
-                    )}
-                  </div>
-                </div>
-                <div className="flex flex-shrink-0 items-center gap-3">
-                  <button onClick={() => startEdit(e)} className="text-xs font-semibold text-accent-dark">
-                    Edit
-                  </button>
-                  <button onClick={() => deleteEventAction(e.id)} className="text-xs font-semibold text-red-500">
-                    Remove
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="font-display text-xl font-extrabold text-ink">
+          Events <span className="text-muted">({visibleEvents.length})</span>
+        </h1>
+        {!showForm && (
+          <button
+            type="button"
+            onClick={startNew}
+            className="rounded-full bg-accent px-4 py-2 text-sm font-bold text-white transition hover:bg-accent-dark"
+          >
+            + New event
+          </button>
         )}
-      </Card>
+      </div>
 
-      {!showForm ? (
-        <button
-          type="button"
-          onClick={startNew}
-          className="rounded-full bg-accent px-4 py-2 text-sm font-bold text-white transition hover:bg-accent-dark"
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Search name or city…"
+        className="w-full rounded-xl border border-line bg-card px-3.5 py-2.5 text-[15px] outline-none focus:border-accent"
+      />
+
+      <div className="flex flex-wrap items-center gap-2">
+        {([
+          { key: "upcoming", label: "Upcoming" },
+          { key: "past", label: "Past" },
+          { key: "all", label: "All" },
+        ] as { key: DateFilter; label: string }[]).map((f) => (
+          <button
+            key={f.key}
+            onClick={() => setDateFilter(f.key)}
+            className={cn(
+              "rounded-full border px-3 py-1 text-xs font-bold transition",
+              dateFilter === f.key
+                ? "border-ink bg-ink text-white"
+                : "border-line bg-card text-ink-soft hover:border-accent/40"
+            )}
+          >
+            {f.label}
+          </button>
+        ))}
+        <select
+          value={sortDir}
+          onChange={(e) => setSortDir(e.target.value as SortDir)}
+          className="rounded-lg border border-line bg-card px-3 py-1.5 text-sm font-semibold text-ink-soft outline-none focus:border-accent"
         >
-          + New event
-        </button>
-      ) : (
+          <option value="asc">Sort: date ↑</option>
+          <option value="desc">Sort: date ↓</option>
+        </select>
+      </div>
+
+      {showForm && (
         <Card className="p-4">
-          <h3 className="text-sm font-bold text-neutral-800">
+          <h3 className="font-display text-sm font-bold text-ink">
             {editingId ? "Edit event" : "New event (e.g. a general festival with many trucks)"}
           </h3>
           <div className="mt-3 space-y-3">
@@ -311,35 +345,123 @@ export default function AdminEventsTab({
               className={inputClass}
             />
 
-            <div>
-              <span className="mb-1 block text-xs font-medium text-neutral-500">
-                Trucks attending ({draft.truckIds.length} selected)
-              </span>
-              <input
-                value={truckFilter}
-                onChange={(e) => setTruckFilter(e.target.value)}
-                placeholder="Filter trucks…"
-                className={`${inputClass} mb-2`}
-              />
-              <div className="max-h-56 overflow-y-auto rounded-xl border border-neutral-200">
-                {filteredTrucks.map((t) => (
-                  <label
-                    key={t.id}
-                    className="flex items-center gap-2 border-b border-neutral-100 px-3 py-2 text-sm last:border-b-0"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={draft.truckIds.includes(t.id)}
-                      onChange={() => toggleTruck(t.id)}
-                    />
-                    {t.name}
-                  </label>
-                ))}
-                {filteredTrucks.length === 0 && (
-                  <div className="px-3 py-2 text-sm text-neutral-400">No trucks match</div>
-                )}
+            {!editingId ? (
+              <div>
+                <span className="mb-1 block text-xs font-medium text-neutral-500">
+                  Trucks attending ({draft.truckIds.length} selected)
+                </span>
+                <input
+                  value={truckFilter}
+                  onChange={(e) => setTruckFilter(e.target.value)}
+                  placeholder="Filter trucks…"
+                  className={`${inputClass} mb-2`}
+                />
+                <div className="max-h-56 overflow-y-auto rounded-xl border border-neutral-200">
+                  {filteredTrucks.map((t) => (
+                    <label
+                      key={t.id}
+                      className="flex items-center gap-2 border-b border-neutral-100 px-3 py-2 text-sm last:border-b-0"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={draft.truckIds.includes(t.id)}
+                        onChange={() => toggleTruck(t.id)}
+                      />
+                      {t.name}
+                    </label>
+                  ))}
+                  {filteredTrucks.length === 0 && (
+                    <div className="px-3 py-2 text-sm text-neutral-400">No trucks match</div>
+                  )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div>
+                <span className="mb-1 block text-xs font-medium text-neutral-500">
+                  Trucks attending — invite, confirm or remove
+                </span>
+                <div className="space-y-1.5 rounded-xl border border-neutral-200 p-2">
+                  {(editingEvent?.truckLinks ?? []).length === 0 && (
+                    <p className="px-2 py-1.5 text-sm text-neutral-400">No trucks linked yet</p>
+                  )}
+                  {(editingEvent?.truckLinks ?? []).map((link) => {
+                    const truck = truckById.get(link.truck_id);
+                    return (
+                      <div
+                        key={link.truck_id}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm"
+                      >
+                        <span className="min-w-0 flex-1 truncate font-medium text-ink">
+                          {truck?.name ?? "Unknown truck"}
+                        </span>
+                        <div className="flex flex-shrink-0 items-center gap-1.5">
+                          <select
+                            defaultValue={link.status}
+                            onChange={(e) =>
+                              setEventTruckStatusAction(
+                                editingId,
+                                link.truck_id,
+                                e.target.value as EventTruckStatus
+                              )
+                            }
+                            className="rounded-lg border border-neutral-200 bg-white px-2 py-1 text-xs font-bold text-neutral-600 outline-none focus:border-accent"
+                          >
+                            <option value="invited">Invited</option>
+                            <option value="confirmed">Confirmed</option>
+                            <option value="declined">Declined</option>
+                          </select>
+                          <ActionButton
+                            onRun={() => removeEventTruckAction(editingId, link.truck_id)}
+                            confirm={`Remove ${truck?.name ?? "this truck"} from the event?`}
+                            className="bg-accent/10 text-accent-dark hover:bg-accent/20"
+                          >
+                            Remove
+                          </ActionButton>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <select
+                    value={addTruckId}
+                    onChange={(e) => setAddTruckId(e.target.value)}
+                    className={`${inputClass} flex-1`}
+                  >
+                    <option value="">Add a truck…</option>
+                    {addableTrucks.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    disabled={!addTruckId}
+                    onClick={() => {
+                      const id = addTruckId;
+                      setAddTruckId("");
+                      void setEventTruckStatusAction(editingId, id, "confirmed");
+                    }}
+                    className="rounded-xl bg-live/10 px-3 py-2.5 text-xs font-bold text-live disabled:opacity-40"
+                  >
+                    Add confirmed
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!addTruckId}
+                    onClick={() => {
+                      const id = addTruckId;
+                      setAddTruckId("");
+                      void setEventTruckStatusAction(editingId, id, "invited");
+                    }}
+                    className="rounded-xl bg-amber/10 px-3 py-2.5 text-xs font-bold text-amber disabled:opacity-40"
+                  >
+                    Invite
+                  </button>
+                </div>
+              </div>
+            )}
 
             {error && <p className="text-xs font-semibold text-red-500">{error}</p>}
 
@@ -359,6 +481,128 @@ export default function AdminEventsTab({
           </div>
         </Card>
       )}
+
+      {visibleEvents.length === 0 ? (
+        <Card className="p-6 text-center text-sm text-muted">
+          {events.length === 0 ? "No events yet" : "No events match these filters"}
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {visibleEvents.map((e) => (
+            <AdminEventCard
+              key={e.id}
+              event={e}
+              truckById={truckById}
+              past={e.end_date < today}
+              onEdit={() => startEdit(e)}
+              onDelete={() => deleteEventAction(e.id, e.created_by_truck_id)}
+            />
+          ))}
+        </div>
+      )}
     </div>
+  );
+}
+
+function AdminEventCard({
+  event,
+  truckById,
+  past,
+  onEdit,
+  onDelete,
+}: {
+  event: AdminEvent;
+  truckById: Map<string, AdminEventTruckOption>;
+  past: boolean;
+  onEdit: () => void;
+  onDelete: () => Promise<{ error?: string } | void>;
+}) {
+  const meta = EVENT_TYPE_META[event.event_type ?? "other"];
+  const time = formatEventTime(event.start_time, event.end_time);
+  const confirmed = event.truckLinks.filter((l) => l.status === "confirmed");
+  const invited = event.truckLinks.filter((l) => l.status === "invited");
+
+  return (
+    <Card className="flex flex-col overflow-hidden p-0">
+      <div className="relative aspect-[16/10] w-full overflow-hidden bg-paper-deep">
+        {event.image_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={event.image_url} alt={event.name} className="h-full w-full object-cover" />
+        ) : (
+          <div className={`flex h-full w-full items-center justify-center text-5xl ${meta.badge.split(" ")[0]}`}>
+            {meta.emoji}
+          </div>
+        )}
+        <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
+          <EventTypeBadge type={event.event_type} size="md" className="bg-white/95 backdrop-blur-sm" />
+          {past && (
+            <span className="rounded-full bg-black/70 px-2.5 py-1 text-xs font-bold text-white backdrop-blur-sm">
+              Past
+            </span>
+          )}
+        </div>
+        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3">
+          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-white">
+            <CalendarDays className="h-3.5 w-3.5" />
+            {formatEventDateRange(event.start_date, event.end_date)}
+            {time && ` · ${time}`}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-1 flex-col p-4">
+        <h3 className="font-display text-base font-bold leading-snug text-ink">{event.name}</h3>
+        <p className="mt-1 flex items-start gap-1.5 text-sm text-muted">
+          <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-muted" />
+          <span className="line-clamp-1">{event.location_name}</span>
+        </p>
+
+        <div className="mt-2.5 flex flex-wrap gap-1.5">
+          {confirmed.length === 0 && invited.length === 0 ? (
+            <span className="text-xs text-muted">No trucks linked</span>
+          ) : (
+            <>
+              {confirmed.map((l) => (
+                <span
+                  key={l.truck_id}
+                  className="rounded-full bg-live/10 px-2 py-0.5 text-[11px] font-semibold text-live"
+                >
+                  {truckById.get(l.truck_id)?.name ?? "Unknown truck"}
+                </span>
+              ))}
+              {invited.map((l) => (
+                <span
+                  key={l.truck_id}
+                  className="rounded-full border border-dashed border-amber/50 bg-amber/10 px-2 py-0.5 text-[11px] font-semibold text-amber"
+                >
+                  {truckById.get(l.truck_id)?.name ?? "Unknown truck"} · invited
+                </span>
+              ))}
+            </>
+          )}
+        </div>
+
+        {event.interestedCount > 0 && (
+          <p className="mt-1.5 text-xs text-muted">{event.interestedCount} interested</p>
+        )}
+
+        <div className="mt-3 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onEdit}
+            className="rounded-lg border border-line bg-card px-3 py-1.5 text-xs font-bold text-ink-soft transition hover:border-accent/40"
+          >
+            Edit
+          </button>
+          <ActionButton
+            onRun={onDelete}
+            confirm={`Delete "${event.name}" permanently? This cannot be undone.`}
+            className="ml-auto bg-accent/10 text-accent-dark hover:bg-accent/20"
+          >
+            Delete
+          </ActionButton>
+        </div>
+      </div>
+    </Card>
   );
 }

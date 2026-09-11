@@ -238,6 +238,21 @@ export interface DashboardEvent extends EventWithTrucks {
   collaborators: EventCollaborator[];
 }
 
+/** One `event_trucks` row as seen by admin -- truck id + link status only.
+ *  Names/logos are resolved by the caller from the full admin truck list
+ *  (service-role sourced, so paused/inactive trucks still resolve). */
+export interface AdminEventLink {
+  truck_id: string;
+  status: EventTruckStatus;
+}
+
+/** Every event (past + upcoming), with every truck link at any status --
+ *  what the admin Events tab needs to show and manage the full picture. */
+export interface AdminEvent extends FmtEvent {
+  truckLinks: AdminEventLink[];
+  interestedCount: number;
+}
+
 export interface TruckPhoto {
   id: string;
   truck_id: string;
