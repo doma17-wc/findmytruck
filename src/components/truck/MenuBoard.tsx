@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { X } from "lucide-react";
 import { formatChf, groupMenu, MENU_DIETARY_TAGS, type MenuItem } from "@/lib/menu";
 
@@ -77,11 +78,13 @@ export default function MenuBoard({ items }: { items: MenuItem[] }) {
                       className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-xl bg-paper-deep sm:h-28 sm:w-28"
                       aria-label={`View photo of ${item.name}`}
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
+                      <Image
                         src={item.photo_url!}
                         alt={item.name}
-                        className={`h-full w-full object-cover transition duration-300 hover:scale-105 ${
+                        fill
+                        sizes="112px"
+                        quality={85}
+                        className={`object-cover transition duration-300 hover:scale-105 ${
                           item.sold_out ? "grayscale" : ""
                         }`}
                       />

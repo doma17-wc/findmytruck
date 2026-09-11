@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { CalendarDays, MapPin, Users } from "lucide-react";
 import type { EventWithTrucks } from "@/lib/types";
 import { EVENT_TYPE_META, normalizeEventType } from "@/lib/types";
@@ -33,8 +34,14 @@ export default function TruckEventCard({
       >
         <div className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-xl bg-brand-50">
           {event.image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={event.image_url} alt={event.name} className="h-full w-full object-cover" />
+            <Image
+              src={event.image_url}
+              alt={event.name}
+              fill
+              sizes="96px"
+              quality={85}
+              className="object-cover"
+            />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-3xl">{meta.emoji}</div>
           )}
@@ -65,11 +72,13 @@ export default function TruckEventCard({
     >
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-brand-50">
         {event.image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
+          <Image
             src={event.image_url}
             alt={event.name}
-            className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1024px) 45vw, 400px"
+            quality={85}
+            className="object-cover transition duration-500 group-hover:scale-[1.03]"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-5xl">{meta.emoji}</div>

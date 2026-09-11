@@ -147,6 +147,7 @@ export default function ProfileGallery({
                 draggable={false}
                 className="pointer-events-none object-cover"
                 sizes={sizes}
+                quality={90}
               />
             </button>
           ))}
@@ -233,6 +234,7 @@ export default function ProfileGallery({
               fill
               className="object-contain"
               sizes="100vw"
+              quality={95}
             />
           </div>
           {images.length > 1 && (

@@ -34,7 +34,7 @@ export default function DishPhotoButton({
     setError(null);
     setUploading(true);
     try {
-      const uploaded = await uploadTruckImage(truckId, file, "dish", 1000);
+      const uploaded = await uploadTruckImage(truckId, file, "dish", 1400);
       onChange(uploaded);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed");

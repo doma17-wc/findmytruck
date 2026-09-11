@@ -13,7 +13,7 @@ import {
 import PhotoGalleryManager from "@/components/shared/PhotoGalleryManager";
 
 async function uploadToStorage(truckId: string, file: File): Promise<string> {
-  const { blob, ext, contentType } = await resizeImage(file, 1600);
+  const { blob, ext, contentType } = await resizeImage(file, 2000);
   const path = `${truckId}/gallery-${crypto.randomUUID()}.${ext}`;
   const { error } = await supabase.storage
     .from(PHOTO_BUCKET)

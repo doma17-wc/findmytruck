@@ -13,7 +13,7 @@ const PASSTHROUGH = new Set(["image/gif", "image/svg+xml"]);
  * jpeg fallback) to keep uploads small. Falls back to the original file whenever
  * the browser can't decode/encode it (old Safari, animated gifs, SVG…).
  */
-export async function resizeImage(file: File, maxWidth = 1600, quality = 0.82): Promise<ResizedImage> {
+export async function resizeImage(file: File, maxWidth = 2000, quality = 0.85): Promise<ResizedImage> {
   const fallback: ResizedImage = {
     blob: file,
     ext: (file.name.split(".").pop() || "jpg").toLowerCase().replace(/[^a-z0-9]/g, "") || "jpg",

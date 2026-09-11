@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Image from "next/image";
 import { notFound } from "next/navigation";
 import { ArrowLeft, CalendarDays, Clock, Link2, MapPin } from "lucide-react";
 import { getEventById } from "@/lib/events";
@@ -69,8 +70,15 @@ export default async function EventDetailPage({ params }: Props) {
       <div className="mt-4 overflow-hidden rounded-3xl border border-neutral-100 bg-white shadow-card">
         <div className="relative aspect-[16/9] w-full bg-brand-50">
           {event.image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={event.image_url} alt={event.name} className="h-full w-full object-cover" />
+            <Image
+              src={event.image_url}
+              alt={event.name}
+              fill
+              priority
+              sizes="(max-width: 672px) 100vw, 672px"
+              quality={90}
+              className="object-cover"
+            />
           ) : (
             <div className="flex h-full w-full items-center justify-center text-6xl">🎪</div>
           )}

@@ -54,7 +54,14 @@ export default async function FavoritesPage() {
               <Link href={`/trucks/${truck.slug}`} className="block">
                 <div className="relative h-36 w-full bg-neutral-100">
                   {truck.cover_photo_url ? (
-                    <Image src={truck.cover_photo_url} alt={truck.name} fill className="object-cover" />
+                    <Image
+                      src={truck.cover_photo_url}
+                      alt={truck.name}
+                      fill
+                      className="object-cover"
+                      sizes="(max-width: 640px) 100vw, 50vw"
+                      quality={85}
+                    />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center text-4xl">🚚</div>
                   )}

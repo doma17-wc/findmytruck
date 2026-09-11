@@ -13,7 +13,7 @@ export async function uploadTruckImage(
   truckId: string,
   file: File,
   kind: string,
-  maxWidth = 1600
+  maxWidth = 2000
 ): Promise<string> {
   const supabase = createClient();
   const { blob, ext, contentType } = await resizeImage(file, maxWidth);

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { CalendarDays, MapPin } from "lucide-react";
 import type { EventWithTrucks } from "@/lib/types";
 import { EVENT_TYPE_META, normalizeEventType } from "@/lib/types";
@@ -56,11 +57,13 @@ export default function EventCard({
       <Link href={`/events/${event.id}`} className="block">
         <div className="relative aspect-[16/10] w-full overflow-hidden bg-brand-50">
           {event.image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            <Image
               src={event.image_url}
               alt={event.name}
-              className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.03]"
+              fill
+              sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 330px"
+              quality={85}
+              className="object-cover transition duration-500 group-hover:scale-[1.03]"
             />
           ) : (
             <div

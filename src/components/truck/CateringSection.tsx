@@ -1,3 +1,4 @@
+import Image from "next/image";
 import { Mail, MapPin, Phone, Users } from "lucide-react";
 import type { PublicTruck } from "@/lib/types";
 import {
@@ -30,13 +31,16 @@ export default function CateringSection({ truck }: { truck: PublicTruck }) {
         {photos.length > 0 && (
           <div className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1">
             {photos.map((p) => (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                key={p.id}
-                src={p.url}
-                alt={p.caption ?? "Catering photo"}
-                className="h-28 w-40 flex-shrink-0 rounded-xl object-cover"
-              />
+              <div key={p.id} className="relative h-28 w-40 flex-shrink-0 overflow-hidden rounded-xl bg-paper-deep">
+                <Image
+                  src={p.url}
+                  alt={p.caption ?? "Catering photo"}
+                  fill
+                  sizes="160px"
+                  quality={85}
+                  className="object-cover"
+                />
+              </div>
             ))}
           </div>
         )}
