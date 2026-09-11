@@ -61,6 +61,8 @@ export default async function DashboardPage({
     { data: impressionRows },
     { data: qrRows },
     { data: contentViewRows },
+    { data: ownerActivityRow },
+    { data: ownerActivityDailyRows },
     dashboardEvents,
   ] = await Promise.all([
     supabase.from("trucks").select("*").eq("id", truckId).maybeSingle(),
@@ -86,6 +88,18 @@ export default async function DashboardPage({
     supabase
       .from("truck_content_views")
       .select("content_type, content_key, count")
+      .eq("truck_id", truckId)
+      .gte("date", dateStr(new Date(thirtyDaysAgoIso))),
+    supabase
+      .from("owner_activity")
+      .select("visit_count, last_seen_at, last_content_update_at")
+      .eq("user_id", auth.user.id)
+      .eq("truck_id", truckId)
+      .maybeSingle(),
+    supabase
+      .from("owner_activity_daily")
+      .select("count")
+      .eq("user_id", auth.user.id)
       .eq("truck_id", truckId)
       .gte("date", dateStr(new Date(thirtyDaysAgoIso))),
     getDashboardEvents(truckId),
@@ -283,6 +297,17 @@ export default async function DashboardPage({
   const boost = readBoost(truck as Truck);
   const boosted = isBoostActive(boost, now);
 
+  // ---- Owner's own engagement: a friendly nudge, not a surveillance panel ----
+  const ownerActivity = ownerActivityRow as {
+    visit_count: number;
+    last_seen_at: string;
+    last_content_update_at: string | null;
+  } | null;
+  const ownerVisits30 = ((ownerActivityDailyRows ?? []) as { count: number }[]).reduce(
+    (s, r) => s + r.count,
+    0
+  );
+
   const stats: DashboardStats = {
     viewsToday,
     views7,
@@ -306,6 +331,9 @@ export default async function DashboardPage({
     qrScans,
     topMenuItems,
     topPhotos,
+    ownerVisits30,
+    ownerVisitsTotal: ownerActivity?.visit_count ?? 0,
+    ownerLastContentUpdateAt: ownerActivity?.last_content_update_at ?? null,
   };
 
   return (

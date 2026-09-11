@@ -18,6 +18,11 @@ export interface AdminTruck extends Truck {
   impressions30: number;
   views30: number;
   boostedNow: boolean;
+  /** Owner dashboard engagement (migration 0022), summed across co-owners. */
+  ownerVisitsTotal: number;
+  ownerVisits30: number;
+  ownerLastSeenAt: string | null;
+  ownerLastContentUpdateAt: string | null;
 }
 
 export interface AdminUser {

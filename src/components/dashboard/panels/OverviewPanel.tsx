@@ -1,9 +1,10 @@
 "use client";
 
-import { Eye, Users, UtensilsCrossed, Zap, ArrowRight, TrendingUp, TrendingDown } from "lucide-react";
+import { Eye, Users, UtensilsCrossed, Zap, ArrowRight, TrendingUp, TrendingDown, Sparkles } from "lucide-react";
 import type { Truck } from "@/lib/types";
 import { Card, CardBody, BarChart } from "../ui";
 import BoostHero from "../BoostHero";
+import { timeAgo } from "@/lib/timeAgo";
 import type { DashboardStats } from "../DashboardApp";
 
 interface Props {
@@ -111,6 +112,30 @@ function ReachCard({ stats }: { stats: DashboardStats }) {
   );
 }
 
+function EngagementNudge({ stats }: { stats: DashboardStats }) {
+  const hasUpdated = Boolean(stats.ownerLastContentUpdateAt);
+
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-line bg-card px-5 py-4 shadow-paper">
+      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-accent/10 text-accent">
+        <Sparkles className="h-4 w-4" />
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm font-bold text-ink">
+          {stats.ownerVisits30 > 0
+            ? `You've opened your dashboard ${stats.ownerVisits30} time${stats.ownerVisits30 === 1 ? "" : "s"} this month`
+            : "Welcome back!"}
+        </p>
+        <p className="text-xs text-muted">
+          {hasUpdated
+            ? `Last profile update: ${timeAgo(stats.ownerLastContentUpdateAt)}`
+            : "Tip: keeping your menu and hours fresh helps you show up more often"}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export default function OverviewPanel({
   truck,
   boosted,
@@ -143,6 +168,8 @@ export default function OverviewPanel({
           <ArrowRight className="h-4 w-4" />
         </button>
       </BoostHero>
+
+      <EngagementNudge stats={stats} />
 
       <ReachCard stats={stats} />
 

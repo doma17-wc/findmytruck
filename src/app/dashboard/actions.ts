@@ -104,6 +104,7 @@ export async function saveSettingsAction(
   const { error } = await supabase.from("trucks").update(payload).eq("id", truckId);
   if (error) return { error: error.message };
 
+  void supabase.rpc("record_owner_content_update", { p_truck_id: truckId });
   revalidateEverywhere();
   return { success: true };
 }
@@ -142,6 +143,7 @@ export async function saveMenuAction(truckId: string, items: unknown): Promise<A
     .eq("id", truckId);
   if (error) return { error: error.message };
 
+  void supabase.rpc("record_owner_content_update", { p_truck_id: truckId });
   revalidateEverywhere();
   return { success: true };
 }
@@ -257,6 +259,7 @@ export async function publishTourAction(
     if (insError) return { error: insError.message };
   }
 
+  void supabase.rpc("record_owner_content_update", { p_truck_id: truckId });
   revalidateEverywhere();
   return { success: true };
 }

@@ -55,6 +55,12 @@ export interface DashboardStats {
   /** Last 30 days, top 5 by content-view count. */
   topMenuItems: { label: string; value: number }[];
   topPhotos: { label: string; value: number }[];
+  /** How many times THIS owner opened the dashboard for this truck, last 30 days. */
+  ownerVisits30: number;
+  /** Lifetime dashboard-open count, for this owner + this truck. */
+  ownerVisitsTotal: number;
+  /** Last time this owner saved their profile, menu, or schedule. */
+  ownerLastContentUpdateAt: string | null;
 }
 
 interface Props {

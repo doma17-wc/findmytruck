@@ -53,6 +53,7 @@ export default async function AdminDashboardPage() {
     { data: cuisineRows },
     { data: favoriteRows },
     { data: ownerActivityRows },
+    { data: ownerActivityDailyRows },
     events,
   ] = await Promise.all([
     service.from("trucks").select("*").order("created_at", { ascending: false }),
@@ -75,7 +76,11 @@ export default async function AdminDashboardPage() {
       .from("user_favorites")
       .select("created_at")
       .gte("created_at", ninetyDaysAgo.toISOString()),
-    service.from("owner_activity").select("truck_id, last_seen_at"),
+    service.from("owner_activity").select("user_id, truck_id, last_seen_at, visit_count, last_content_update_at"),
+    service
+      .from("owner_activity_daily")
+      .select("truck_id, count")
+      .gte("date", dateStr(thirtyDaysAgo)),
     getAllEventsForAdmin(),
   ]);
 
@@ -111,6 +116,30 @@ export default async function AdminDashboardPage() {
       viewsByTruck30.set(r.truck_id, (viewsByTruck30.get(r.truck_id) ?? 0) + 1);
     });
 
+  // ---- Owner engagement, per truck (migration 0022 -- keyed on user+truck so
+  // a multi-truck owner's activity is attributed correctly to each truck) ----
+  const ownerVisitsTotalByTruck = new Map<string, number>();
+  const ownerLastSeenByTruck = new Map<string, string>();
+  const ownerLastContentUpdateByTruck = new Map<string, string>();
+  ((ownerActivityRows ?? []) as {
+    truck_id: string;
+    last_seen_at: string;
+    visit_count: number;
+    last_content_update_at: string | null;
+  }[]).forEach((r) => {
+    ownerVisitsTotalByTruck.set(r.truck_id, (ownerVisitsTotalByTruck.get(r.truck_id) ?? 0) + r.visit_count);
+    const seen = ownerLastSeenByTruck.get(r.truck_id);
+    if (!seen || r.last_seen_at > seen) ownerLastSeenByTruck.set(r.truck_id, r.last_seen_at);
+    if (r.last_content_update_at) {
+      const upd = ownerLastContentUpdateByTruck.get(r.truck_id);
+      if (!upd || r.last_content_update_at > upd) ownerLastContentUpdateByTruck.set(r.truck_id, r.last_content_update_at);
+    }
+  });
+  const ownerVisits30ByTruck = new Map<string, number>();
+  ((ownerActivityDailyRows ?? []) as { truck_id: string; count: number }[]).forEach((r) => {
+    ownerVisits30ByTruck.set(r.truck_id, (ownerVisits30ByTruck.get(r.truck_id) ?? 0) + r.count);
+  });
+
   const trucks: AdminTruck[] = ((truckRows ?? []) as Truck[]).map((t) => ({
     ...t,
     claim_status: claimStatusOf(t),
@@ -119,6 +148,10 @@ export default async function AdminDashboardPage() {
     impressions30: impressionsByTruck30.get(t.id) ?? 0,
     views30: viewsByTruck30.get(t.id) ?? 0,
     boostedNow: isBoostActive(readBoost(t), now),
+    ownerVisitsTotal: ownerVisitsTotalByTruck.get(t.id) ?? 0,
+    ownerVisits30: ownerVisits30ByTruck.get(t.id) ?? 0,
+    ownerLastSeenAt: ownerLastSeenByTruck.get(t.id) ?? null,
+    ownerLastContentUpdateAt: ownerLastContentUpdateByTruck.get(t.id) ?? null,
   }));
 
   // ---- Users (needs the service-role key) ----

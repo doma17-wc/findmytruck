@@ -10,6 +10,7 @@ import {
   deleteTruckAction,
 } from "@/app/admin/actions";
 import { cn, Card, Badge, ActionButton } from "./ui";
+import { timeAgo } from "@/lib/timeAgo";
 
 type StatusFilter =
   | "all"
@@ -181,6 +182,18 @@ export default function TrucksTab({ trucks }: { trucks: AdminTruck[] }) {
   );
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Green = owner opened the dashboard within 7 days, amber = 8-30 days,
+ *  neutral (grey) = 30+ days or never -- an at-a-glance "worth a call?" cue. */
+function EngagementBadge({ t }: { t: AdminTruck }) {
+  if (!t.ownerLastSeenAt) return <Badge>Never opened dashboard</Badge>;
+  const ageDays = (Date.now() - new Date(t.ownerLastSeenAt).getTime()) / DAY_MS;
+  if (ageDays <= 7) return <Badge tone="green">Active</Badge>;
+  if (ageDays <= 30) return <Badge tone="amber">Quiet</Badge>;
+  return <Badge>Dormant</Badge>;
+}
+
 function TruckRow({ t }: { t: AdminTruck }) {
   const cs = t.claim_status ?? "unclaimed";
   return (
@@ -200,6 +213,7 @@ function TruckRow({ t }: { t: AdminTruck }) {
             {cs === "claimed" && <Badge tone="blue">Claimed</Badge>}
             {cs === "unclaimed" && <Badge>Unclaimed</Badge>}
             {!t.is_active && <Badge>Inactive</Badge>}
+            {cs === "claimed" && <EngagementBadge t={t} />}
           </div>
           <p className="mt-1 truncate text-sm text-muted">
             {(t.cuisine_type ?? []).join(", ") || "No cuisine"}
@@ -215,6 +229,13 @@ function TruckRow({ t }: { t: AdminTruck }) {
               ` · ${Math.round((t.views30 / t.impressions30) * 1000) / 10}% conversion`}{" "}
             (30d)
           </p>
+          {cs === "claimed" && (
+            <p className="mt-0.5 text-xs text-muted">
+              Owner: {t.ownerVisitsTotal} dashboard opens ({t.ownerVisits30} last 30d) · last seen{" "}
+              {timeAgo(t.ownerLastSeenAt)}
+              {t.ownerLastContentUpdateAt && ` · last updated ${timeAgo(t.ownerLastContentUpdateAt)}`}
+            </p>
+          )}
         </div>
       </div>
 
