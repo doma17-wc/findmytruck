@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { getCurrentUserProfile, getOwnedTrucks, createClient } from "@/lib/supabase/server";
 import type { Truck, TruckSchedule, TruckPhoto, Review } from "@/lib/types";
 import { normalizeMenuItems } from "@/lib/menu";
-import { getMondayFirstDay, readBoost, isBoostActive } from "@/lib/geo";
+import { readBoost, isBoostActive } from "@/lib/geo";
 import { getDashboardEvents } from "@/lib/events";
 import { DASH_TRUCK_COOKIE, resolveSelectedTruck } from "@/lib/dashboardTruck";
 import DashboardApp, { type DashboardStats } from "@/components/dashboard/DashboardApp";
@@ -48,7 +48,8 @@ export default async function DashboardPage({
   const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const ninetyDaysAgo = new Date(now.getTime() - 90 * DAY).toISOString();
 
-  const fourteenDaysAgo = dateStr(new Date(startOfToday.getTime() - 13 * DAY));
+  const twentyEightDaysAgo = dateStr(new Date(startOfToday.getTime() - 27 * DAY));
+  const thirtyDaysAgoIso = new Date(startOfToday.getTime() - 29 * DAY).toISOString();
 
   const [
     { data: truck },
@@ -58,6 +59,8 @@ export default async function DashboardPage({
     { data: viewRows },
     { data: favRows },
     { data: impressionRows },
+    { data: qrRows },
+    { data: contentViewRows },
     dashboardEvents,
   ] = await Promise.all([
     supabase.from("trucks").select("*").eq("id", truckId).maybeSingle(),
@@ -70,7 +73,7 @@ export default async function DashboardPage({
       .order("created_at", { ascending: false }),
     supabase
       .from("truck_page_views")
-      .select("viewed_at")
+      .select("viewed_at, source")
       .eq("truck_id", truckId)
       .gte("viewed_at", ninetyDaysAgo),
     supabase.from("user_favorites").select("created_at").eq("truck_id", truckId),
@@ -78,13 +81,23 @@ export default async function DashboardPage({
       .from("truck_impressions")
       .select("date, count")
       .eq("truck_id", truckId)
-      .gte("date", fourteenDaysAgo),
+      .gte("date", twentyEightDaysAgo),
+    supabase.from("qr_redirects").select("scan_count").eq("truck_id", truckId),
+    supabase
+      .from("truck_content_views")
+      .select("content_type, content_key, count")
+      .eq("truck_id", truckId)
+      .gte("date", dateStr(new Date(thirtyDaysAgoIso))),
     getDashboardEvents(truckId),
   ]);
 
   if (!truck) redirect("/dashboard");
 
-  const views = (viewRows ?? []) as { viewed_at: string }[];
+  // Fire-and-forget: records this dashboard visit for admin's owner-engagement
+  // view (active vs dormant trucks). Never blocks the page render.
+  void supabase.rpc("record_owner_activity", { p_truck_id: truckId });
+
+  const views = (viewRows ?? []) as { viewed_at: string; source: string | null }[];
   const favs = (favRows ?? []) as { created_at: string }[];
   const impressionsByDate = new Map(
     ((impressionRows ?? []) as { date: string; count: number }[]).map((r) => [r.date, r.count])
@@ -108,6 +121,14 @@ export default async function DashboardPage({
   }
   const views7 = weeklyViews.reduce((sum, d) => sum + d.value, 0);
 
+  // ---- Views the week before that (7-13 days ago), for the conversion trend ----
+  const prevWeekStart = new Date(startOfToday.getTime() - 13 * DAY);
+  const prevWeekEnd = new Date(startOfToday.getTime() - 6 * DAY);
+  const viewsPrev7 = views.filter((v) => {
+    const d = new Date(v.viewed_at);
+    return d >= prevWeekStart && d < prevWeekEnd;
+  }).length;
+
   // ---- Impressions: today, this week, last week (for the trend), and a
   // 7-day daily series -- summed from the daily counter, not one row per hit.
   const impressionsToday = impressionsByDate.get(dateStr(startOfToday)) ?? 0;
@@ -128,25 +149,72 @@ export default async function DashboardPage({
     impressionsPrev7 += impressionsByDate.get(dateStr(day)) ?? 0;
   }
 
-  // ---- Average views by weekday (Mon-first), over the 90-day window ----
+  // ---- Views & impressions over the last 4 weeks, bucketed by week (for the
+  // dashboard's 7d/30d toggle) ----
+  const monthlyViewsByWeek: { label: string; value: number }[] = [];
+  const monthlyImpressionsByWeek: { label: string; value: number }[] = [];
+  for (let w = 3; w >= 0; w--) {
+    const weekEndExclusive = new Date(startOfToday.getTime() - w * 7 * DAY + DAY);
+    const weekStart = new Date(weekEndExclusive.getTime() - 7 * DAY);
+    const label = new Date(weekEndExclusive.getTime() - DAY).toLocaleDateString("en", {
+      month: "short",
+      day: "numeric",
+    });
+    const viewsCount = views.filter((v) => {
+      const d = new Date(v.viewed_at);
+      return d >= weekStart && d < weekEndExclusive;
+    }).length;
+    let impCount = 0;
+    for (let d = new Date(weekStart); d < weekEndExclusive; d = new Date(d.getTime() + DAY)) {
+      impCount += impressionsByDate.get(dateStr(d)) ?? 0;
+    }
+    monthlyViewsByWeek.push({ label, value: viewsCount });
+    monthlyImpressionsByWeek.push({ label, value: impCount });
+  }
+
+  // ---- Best days / best times: Europe/Zurich local calendar day & hour, not
+  // the server's (UTC on Vercel) -- otherwise every bucket would be off by a
+  // few hours for Swiss visitors. ----
+  const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const zurichWeekdayIdx = (d: Date) => {
+    const name = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Zurich", weekday: "short" }).format(d);
+    return WEEKDAY_LABELS.indexOf(name);
+  };
+  const zurichDateKey = (d: Date) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Zurich" }).format(d);
+  const zurichHour = (d: Date) =>
+    parseInt(
+      new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Zurich", hour: "2-digit", hour12: false }).format(d),
+      10
+    ) % 24;
+
+  // Average views by weekday, over the 90-day window.
   const weekdayTotals = Array(7).fill(0);
   const weekdayObserved = Array(7).fill(0);
   {
     const seen = new Set<string>();
     for (let i = 0; i < 90; i++) {
       const d = new Date(startOfToday.getTime() - i * DAY);
-      weekdayObserved[getMondayFirstDay(d)] += 1;
-      seen.add(d.toDateString());
+      weekdayObserved[zurichWeekdayIdx(d)] += 1;
+      seen.add(zurichDateKey(d));
     }
     for (const v of views) {
       const d = new Date(v.viewed_at);
-      if (seen.has(d.toDateString())) weekdayTotals[getMondayFirstDay(d)] += 1;
+      if (seen.has(zurichDateKey(d))) weekdayTotals[zurichWeekdayIdx(d)] += 1;
     }
   }
-  const byWeekday = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((label, idx) => ({
+  const byWeekday = WEEKDAY_LABELS.map((label, idx) => ({
     label,
     value: weekdayObserved[idx] ? Math.round((weekdayTotals[idx] / weekdayObserved[idx]) * 10) / 10 : 0,
   }));
+
+  // Total views by time of day, over the same 90-day window.
+  const HOUR_BUCKET_LABELS = ["12–4am", "4–8am", "8am–12pm", "12–4pm", "4–8pm", "8pm–12am"];
+  const hourTotals = Array(6).fill(0);
+  for (const v of views) {
+    hourTotals[Math.floor(zurichHour(new Date(v.viewed_at)) / 4)] += 1;
+  }
+  const byHour = HOUR_BUCKET_LABELS.map((label, i) => ({ label, value: hourTotals[i] }));
 
   // ---- Follower growth: cumulative total at the end of each of the last 8 weeks ----
   const sortedFavDates = favs.map((f) => new Date(f.created_at).getTime()).sort((a, b) => a - b);
@@ -158,6 +226,53 @@ export default async function DashboardPage({
       value: sortedFavDates.filter((t) => t <= weekEnd).length,
     });
   }
+
+  const newFollowers7 = favs.filter((f) => new Date(f.created_at) >= new Date(startOfToday.getTime() - 6 * DAY))
+    .length;
+
+  // ---- Where views come from, over the last 30 days ----
+  const thirtyDaysAgoStart = new Date(startOfToday.getTime() - 29 * DAY);
+  const SOURCE_LABELS: Record<string, string> = {
+    map: "Map",
+    list: "Browse list",
+    profile: "Direct link",
+    qr: "QR scan",
+  };
+  const sourceCounts: Record<string, number> = {};
+  for (const v of views) {
+    if (new Date(v.viewed_at) < thirtyDaysAgoStart) continue;
+    const key = v.source ?? "profile";
+    sourceCounts[key] = (sourceCounts[key] ?? 0) + 1;
+  }
+  const viewSources = (["map", "list", "profile", "qr"] as const).map((key) => ({
+    label: SOURCE_LABELS[key],
+    value: sourceCounts[key] ?? 0,
+  }));
+
+  const qrScans = ((qrRows ?? []) as { scan_count: number }[]).reduce(
+    (sum, r) => sum + (r.scan_count ?? 0),
+    0
+  );
+
+  // ---- What people look at: top menu items / photos, last 30 days ----
+  const contentRows = (contentViewRows ?? []) as { content_type: string; content_key: string; count: number }[];
+  const menuTotals = new Map<string, number>();
+  const photoTotals = new Map<string, number>();
+  for (const r of contentRows) {
+    const map = r.content_type === "menu_item" ? menuTotals : photoTotals;
+    map.set(r.content_key, (map.get(r.content_key) ?? 0) + r.count);
+  }
+  const topMenuItems = [...menuTotals.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([label, value]) => ({ label, value }));
+  const topPhotos = [...photoTotals.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([key, value]) => {
+      const idx = Number(key);
+      return { label: Number.isFinite(idx) ? `Photo ${idx + 1}` : "Photo", value };
+    });
 
   const reviewList = (reviews ?? []) as Review[];
   const avgRating =
@@ -171,17 +286,26 @@ export default async function DashboardPage({
   const stats: DashboardStats = {
     viewsToday,
     views7,
+    viewsPrev7,
     impressionsToday,
     impressions7,
     impressionsPrev7,
     followers: favs.length,
+    newFollowers7,
     menuItemCount: menuItems.length,
     reviewCount: reviewList.length,
     avgRating,
     weeklyViews,
     weeklyImpressions,
+    monthlyViewsByWeek,
+    monthlyImpressionsByWeek,
     byWeekday,
+    byHour,
     followerGrowth,
+    viewSources,
+    qrScans,
+    topMenuItems,
+    topPhotos,
   };
 
   return (

@@ -2,12 +2,19 @@ import { createClient } from "@/lib/supabase/client";
 
 const SESSION_KEY = "fmt_viewed_trucks";
 
+/** Where a profile open originated -- surfaced to owners in Insights. */
+export type ViewSource = "map" | "list" | "profile" | "qr";
+
 /** Records a truck profile view once per browser tab session, skipping the
  * truck's own owner. Called from the client so the insert always runs on the
  * actual visitor's request -- a server-side fire-and-forget insert on an
  * ISR-cached page only fires on the rare request that regenerates the page,
  * which is why views were never being recorded. */
-export function recordTruckView(truckId: string, isOwnerView: boolean): void {
+export function recordTruckView(
+  truckId: string,
+  isOwnerView: boolean,
+  source: ViewSource = "profile"
+): void {
   if (isOwnerView || typeof window === "undefined") return;
 
   try {
@@ -22,7 +29,7 @@ export function recordTruckView(truckId: string, isOwnerView: boolean): void {
 
   void createClient()
     .from("truck_page_views")
-    .insert({ truck_id: truckId })
+    .insert({ truck_id: truckId, source })
     .then(({ error }) => {
       if (error) console.error("[trackView] insert failed:", error.message);
     });

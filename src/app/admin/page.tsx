@@ -4,7 +4,11 @@ import { readBoost, isBoostActive } from "@/lib/geo";
 import type { Truck, QrRedirect } from "@/lib/types";
 import { getAllEventsForAdmin } from "@/lib/events";
 import { getBooleanSetting } from "@/lib/settings";
-import AdminApp, { type AdminTruck, type AdminUser } from "@/components/admin/AdminApp";
+import AdminApp, {
+  type AdminTruck,
+  type AdminUser,
+  type AdminAnalyticsData,
+} from "@/components/admin/AdminApp";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +41,7 @@ export default async function AdminDashboardPage() {
   }
   const now = new Date();
   const thirtyDaysAgo = new Date(now.getTime() - 30 * DAY);
+  const ninetyDaysAgo = new Date(now.getTime() - 90 * DAY);
 
   const [
     { data: truckRows },
@@ -44,19 +49,33 @@ export default async function AdminDashboardPage() {
     reviewsRes,
     { data: impressionRows },
     { data: viewRows },
+    { data: siteVisitRows },
+    { data: cuisineRows },
+    { data: favoriteRows },
+    { data: ownerActivityRows },
     events,
   ] = await Promise.all([
     service.from("trucks").select("*").order("created_at", { ascending: false }),
     supabase.from("qr_redirects").select("truck_id, scan_count"),
-    supabase.from("reviews").select("id, truck_id"),
+    supabase.from("reviews").select("id, truck_id, created_at"),
     supabase
       .from("truck_impressions")
-      .select("truck_id, count")
-      .gte("date", dateStr(thirtyDaysAgo)),
+      .select("truck_id, date, count")
+      .gte("date", dateStr(ninetyDaysAgo)),
     supabase
       .from("truck_page_views")
-      .select("truck_id")
-      .gte("viewed_at", thirtyDaysAgo.toISOString()),
+      .select("truck_id, viewed_at")
+      .gte("viewed_at", ninetyDaysAgo.toISOString()),
+    supabase.from("site_visits").select("date, visit_count").gte("date", dateStr(ninetyDaysAgo)),
+    supabase
+      .from("cuisine_search_events")
+      .select("cuisine, date, count")
+      .gte("date", dateStr(ninetyDaysAgo)),
+    service
+      .from("user_favorites")
+      .select("created_at")
+      .gte("created_at", ninetyDaysAgo.toISOString()),
+    service.from("owner_activity").select("truck_id, last_seen_at"),
     getAllEventsForAdmin(),
   ]);
 
@@ -68,30 +87,37 @@ export default async function AdminDashboardPage() {
     scansByTruck.set(r.truck_id, (scansByTruck.get(r.truck_id) ?? 0) + (r.scan_count ?? 0));
   });
 
+  const allReviews = (reviewsRes.error ? [] : reviewsRes.data ?? []) as {
+    truck_id: string;
+    created_at: string;
+  }[];
+
   const reviewsByTruck = new Map<string, number>();
-  if (!reviewsRes.error) {
-    ((reviewsRes.data ?? []) as { truck_id: string }[]).forEach((r) => {
-      reviewsByTruck.set(r.truck_id, (reviewsByTruck.get(r.truck_id) ?? 0) + 1);
+  allReviews.forEach((r) => {
+    reviewsByTruck.set(r.truck_id, (reviewsByTruck.get(r.truck_id) ?? 0) + 1);
+  });
+
+  const impressionsByTruck30 = new Map<string, number>();
+  ((impressionRows ?? []) as { truck_id: string; date: string; count: number }[])
+    .filter((r) => r.date >= dateStr(thirtyDaysAgo))
+    .forEach((r) => {
+      impressionsByTruck30.set(r.truck_id, (impressionsByTruck30.get(r.truck_id) ?? 0) + r.count);
     });
-  }
 
-  const impressionsByTruck = new Map<string, number>();
-  ((impressionRows ?? []) as { truck_id: string; count: number }[]).forEach((r) => {
-    impressionsByTruck.set(r.truck_id, (impressionsByTruck.get(r.truck_id) ?? 0) + r.count);
-  });
-
-  const viewsByTruck = new Map<string, number>();
-  ((viewRows ?? []) as { truck_id: string }[]).forEach((r) => {
-    viewsByTruck.set(r.truck_id, (viewsByTruck.get(r.truck_id) ?? 0) + 1);
-  });
+  const viewsByTruck30 = new Map<string, number>();
+  ((viewRows ?? []) as { truck_id: string; viewed_at: string }[])
+    .filter((r) => new Date(r.viewed_at) >= thirtyDaysAgo)
+    .forEach((r) => {
+      viewsByTruck30.set(r.truck_id, (viewsByTruck30.get(r.truck_id) ?? 0) + 1);
+    });
 
   const trucks: AdminTruck[] = ((truckRows ?? []) as Truck[]).map((t) => ({
     ...t,
     claim_status: claimStatusOf(t),
     scans: scansByTruck.get(t.id) ?? 0,
     reviewCount: reviewsByTruck.get(t.id) ?? 0,
-    impressions30: impressionsByTruck.get(t.id) ?? 0,
-    views30: viewsByTruck.get(t.id) ?? 0,
+    impressions30: impressionsByTruck30.get(t.id) ?? 0,
+    views30: viewsByTruck30.get(t.id) ?? 0,
     boostedNow: isBoostActive(readBoost(t), now),
   }));
 
@@ -141,6 +167,29 @@ export default async function AdminDashboardPage() {
     users.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   }
 
+  // ---- Platform analytics bundle (last 90 days, plus all owner_activity) --
+  // Sent to the client mostly as-is; the Analytics tab does the 7/30/90-day
+  // slicing so switching ranges doesn't need another round trip.
+  const analytics: AdminAnalyticsData = {
+    dailyVisits: ((siteVisitRows ?? []) as { date: string; visit_count: number }[]).map((r) => ({
+      date: r.date,
+      count: r.visit_count,
+    })),
+    viewEvents: ((viewRows ?? []) as { truck_id: string; viewed_at: string }[]).map((r) => ({
+      truck_id: r.truck_id,
+      date: dateStr(new Date(r.viewed_at)),
+    })),
+    impressionEvents: (impressionRows ?? []) as { truck_id: string; date: string; count: number }[],
+    favoriteEvents: ((favoriteRows ?? []) as { created_at: string }[]).map((r) => ({
+      date: dateStr(new Date(r.created_at)),
+    })),
+    reviewEvents: allReviews
+      .filter((r) => new Date(r.created_at) >= ninetyDaysAgo)
+      .map((r) => ({ date: dateStr(new Date(r.created_at)) })),
+    cuisineEvents: (cuisineRows ?? []) as { cuisine: string; date: string; count: number }[],
+    ownerActivity: (ownerActivityRows ?? []) as { truck_id: string | null; last_seen_at: string }[],
+  };
+
   return (
     <AdminApp
       trucks={trucks}
@@ -148,6 +197,7 @@ export default async function AdminDashboardPage() {
       events={events}
       hasServiceRole={Boolean(service)}
       reviewsRequireLogin={reviewsRequireLogin}
+      analytics={analytics}
     />
   );
 }

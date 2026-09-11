@@ -165,6 +165,50 @@ export function BarChart({
   );
 }
 
+/* ----------------------------- RankedBars --------------------------- *
+ * Horizontal labeled bars for ranked data with longer labels than BarChart
+ * comfortably fits (view sources, top menu items / photos, ...).          */
+
+export function RankedBars({
+  data,
+  accent = "#FF5A3C",
+  emptyLabel = "Not enough data yet",
+}: {
+  data: { label: string; value: number }[];
+  accent?: string;
+  emptyLabel?: string;
+}) {
+  const max = Math.max(1, ...data.map((d) => d.value));
+  const allZero = data.every((d) => d.value === 0);
+
+  if (data.length === 0 || allZero) {
+    return (
+      <div className="flex items-center justify-center rounded-xl border border-dashed border-line py-8 text-center text-sm text-muted">
+        {emptyLabel}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2.5">
+      {data.map((d, i) => (
+        <div key={i} className="flex items-center gap-3">
+          <span className="w-28 flex-shrink-0 truncate text-[13px] font-medium text-ink-soft" title={d.label}>
+            {d.label}
+          </span>
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-paper-deep">
+            <div
+              className="h-full rounded-full transition-all"
+              style={{ width: `${d.value ? Math.max(4, (d.value / max) * 100) : 0}%`, background: accent }}
+            />
+          </div>
+          <span className="w-8 flex-shrink-0 text-right font-mono text-[12px] text-muted">{d.value}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /* ---------------------- shared input styling ---------------------- */
 
 export const dashInput =

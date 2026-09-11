@@ -161,7 +161,7 @@ export default function TruckProfileSections({
       {menuItems.length > 0 && (
         <section className="lg:col-start-1">
           <SectionHeading>Menu</SectionHeading>
-          <MenuBoard items={menuItems} />
+          <MenuBoard items={menuItems} truckId={truck.id} trackViews={!isOwnerView} />
         </section>
       )}
 

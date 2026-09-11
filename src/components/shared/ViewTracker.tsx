@@ -14,7 +14,8 @@ export default function ViewTracker({
   isOwnerView: boolean;
 }) {
   useEffect(() => {
-    recordTruckView(truckId, isOwnerView);
+    const fromQr = new URLSearchParams(window.location.search).get("src") === "qr";
+    recordTruckView(truckId, isOwnerView, fromQr ? "qr" : "profile");
   }, [truckId, isOwnerView]);
 
   return null;

@@ -32,17 +32,29 @@ import SettingsPanel from "./panels/SettingsPanel";
 export interface DashboardStats {
   viewsToday: number;
   views7: number;
+  viewsPrev7: number;
   impressionsToday: number;
   impressions7: number;
   impressionsPrev7: number;
   followers: number;
+  newFollowers7: number;
   menuItemCount: number;
   reviewCount: number;
   avgRating: number;
   weeklyViews: { label: string; value: number }[];
   weeklyImpressions: { label: string; value: number }[];
+  monthlyViewsByWeek: { label: string; value: number }[];
+  monthlyImpressionsByWeek: { label: string; value: number }[];
   byWeekday: { label: string; value: number }[];
+  byHour: { label: string; value: number }[];
   followerGrowth: { label: string; value: number }[];
+  /** Last 30 days: map / browse list / direct link / QR scan. */
+  viewSources: { label: string; value: number }[];
+  /** Lifetime QR scan total (qr_redirects has no date dimension). */
+  qrScans: number;
+  /** Last 30 days, top 5 by content-view count. */
+  topMenuItems: { label: string; value: number }[];
+  topPhotos: { label: string; value: number }[];
 }
 
 interface Props {

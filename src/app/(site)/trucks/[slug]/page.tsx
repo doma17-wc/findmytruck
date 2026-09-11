@@ -13,7 +13,7 @@ import { computeTruckStatus, getMondayFirstDay, readBoost } from "@/lib/geo";
 import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
 import FavoriteButton from "@/components/FavoriteButton";
 import ViewTracker from "@/components/shared/ViewTracker";
-import ProfileGallery from "@/components/truck/ProfileGallery";
+import GalleryWithTracking from "@/components/truck/GalleryWithTracking";
 import TruckProfileSections, { type ProfileStatus } from "@/components/truck/TruckProfileSections";
 
 export const revalidate = 300;
@@ -165,7 +165,9 @@ export default async function TruckProfilePage({ params }: PageProps) {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       <div className="lg:mx-auto lg:max-w-[1180px] lg:px-8 lg:pt-8">
-        <ProfileGallery
+        <GalleryWithTracking
+          truckId={truck.id}
+          isOwnerView={isOwnerView}
           images={galleryImages}
           name={truck.name}
           variant="page"

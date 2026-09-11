@@ -12,6 +12,8 @@ interface ProfileGalleryProps {
   variant?: "sheet" | "page";
   overlayTopLeft?: ReactNode;
   overlayTopRight?: ReactNode;
+  /** Fired when a photo is opened full-size (lightbox), 0-indexed. */
+  onPhotoOpen?: (index: number) => void;
 }
 
 /**
@@ -25,6 +27,7 @@ export default function ProfileGallery({
   variant = "sheet",
   overlayTopLeft,
   overlayTopRight,
+  onPhotoOpen,
 }: ProfileGalleryProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [activeIdx, setActiveIdx] = useState(0);
@@ -134,7 +137,10 @@ export default function ProfileGallery({
               type="button"
               key={src + i}
               onClick={() => {
-                if (!dragRef.current?.moved) setLightbox(i);
+                if (!dragRef.current?.moved) {
+                  setLightbox(i);
+                  onPhotoOpen?.(i);
+                }
               }}
               className="relative h-full w-full flex-shrink-0 snap-center"
               aria-label={`View ${name} photo ${i + 1} full size`}

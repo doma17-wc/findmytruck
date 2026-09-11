@@ -40,42 +40,35 @@ function Kpi({
 function ReachCard({ stats }: { stats: DashboardStats }) {
   const conversion =
     stats.impressions7 > 0 ? Math.round((stats.views7 / stats.impressions7) * 1000) / 10 : 0;
-  const trend =
+  const conversionPrev =
     stats.impressionsPrev7 > 0
-      ? Math.round(((stats.impressions7 - stats.impressionsPrev7) / stats.impressionsPrev7) * 100)
+      ? Math.round((stats.viewsPrev7 / stats.impressionsPrev7) * 1000) / 10
       : null;
+  const trendPts = conversionPrev !== null ? Math.round((conversion - conversionPrev) * 10) / 10 : null;
 
   return (
     <Card>
       <CardBody>
         <div className="flex items-center justify-between gap-2">
           <h2 className="font-display text-base font-bold text-ink">Reach &amp; conversion</h2>
-          {trend !== null && (
+          {trendPts !== null && (
             <span
               className={`inline-flex items-center gap-1 text-xs font-bold ${
-                trend >= 0 ? "text-green-600" : "text-muted"
+                trendPts >= 0 ? "text-green-600" : "text-muted"
               }`}
             >
-              {trend >= 0 ? (
+              {trendPts >= 0 ? (
                 <TrendingUp className="h-3.5 w-3.5" />
               ) : (
                 <TrendingDown className="h-3.5 w-3.5" />
               )}
-              {trend >= 0 ? "+" : ""}
-              {trend}% vs last week
+              {trendPts >= 0 ? "+" : ""}
+              {trendPts} pts vs last week
             </span>
           )}
         </div>
 
-        <div className="mt-4 grid grid-cols-3 gap-3">
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-wider text-muted">
-              Impressions today
-            </p>
-            <p className="mt-1 font-display text-2xl font-extrabold text-ink">
-              {stats.impressionsToday}
-            </p>
-          </div>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-wider text-muted">
               Impressions (7d)
@@ -86,10 +79,24 @@ function ReachCard({ stats }: { stats: DashboardStats }) {
           </div>
           <div>
             <p className="text-[11px] font-bold uppercase tracking-wider text-muted">
+              Views (7d)
+            </p>
+            <p className="mt-1 font-display text-2xl font-extrabold text-ink">{stats.views7}</p>
+          </div>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-muted">
               Conversion
             </p>
             <p className="mt-1 font-display text-2xl font-extrabold text-accent">
               {conversion}%
+            </p>
+          </div>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-muted">
+              New followers (7d)
+            </p>
+            <p className="mt-1 font-display text-2xl font-extrabold text-ink">
+              {stats.newFollowers7}
             </p>
           </div>
         </div>

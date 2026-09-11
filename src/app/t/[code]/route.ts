@@ -26,5 +26,14 @@ export async function GET(
     .eq("short_code", code)
     .then(() => {});
 
-  return NextResponse.redirect(redirect.destination_url, 302);
+  let destination = redirect.destination_url;
+  try {
+    const dest = new URL(destination);
+    dest.searchParams.set("src", "qr");
+    destination = dest.toString();
+  } catch {
+    // Malformed destination_url -- fall back to the raw value untouched.
+  }
+
+  return NextResponse.redirect(destination, 302);
 }

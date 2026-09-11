@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { X } from "lucide-react";
 import { formatChf, groupMenu, MENU_DIETARY_TAGS, type MenuItem } from "@/lib/menu";
+import { recordTruckContentView } from "@/lib/trackContentView";
 
 function DietaryBadges({ ids }: { ids: MenuItem["dietary"] }) {
   if (!ids || ids.length === 0) return null;
@@ -37,7 +38,16 @@ function SoldOut() {
  * Appetite-forward menu board. Dishes with an owner-uploaded photo render as
  * rich cards with the image alongside; the rest fall back to a clean priced row.
  */
-export default function MenuBoard({ items }: { items: MenuItem[] }) {
+export default function MenuBoard({
+  items,
+  truckId,
+  trackViews = false,
+}: {
+  items: MenuItem[];
+  truckId?: string;
+  /** Skip for the truck's own owner viewing their own profile. */
+  trackViews?: boolean;
+}) {
   const [zoom, setZoom] = useState<string | null>(null);
   const groups = groupMenu(items);
 
@@ -74,7 +84,12 @@ export default function MenuBoard({ items }: { items: MenuItem[] }) {
                   >
                     <button
                       type="button"
-                      onClick={() => setZoom(item.photo_url!)}
+                      onClick={() => {
+                        setZoom(item.photo_url!);
+                        if (truckId) {
+                          recordTruckContentView(truckId, "menu_item", item.name, !trackViews);
+                        }
+                      }}
                       className="relative h-24 w-24 flex-shrink-0 overflow-hidden rounded-xl bg-paper-deep sm:h-28 sm:w-28"
                       aria-label={`View photo of ${item.name}`}
                     >

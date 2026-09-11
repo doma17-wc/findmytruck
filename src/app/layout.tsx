@@ -3,6 +3,7 @@ import { Inter, Bricolage_Grotesque, Space_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import CookieBanner from "@/components/site/CookieBanner";
+import SiteVisitTracker from "@/components/shared/SiteVisitTracker";
 import "./globals.css";
 
 const inter = Inter({
@@ -55,6 +56,7 @@ export default function RootLayout({
     >
       <body>
         {children}
+        <SiteVisitTracker />
         <CookieBanner />
         <Analytics />
         <SpeedInsights />

@@ -8,8 +8,8 @@ import { type TruckPhoto } from "@/lib/types";
 import { getMondayFirstDay } from "@/lib/geo";
 import { useLang, weekdayName } from "@/lib/i18n";
 import { createClient } from "@/lib/supabase/client";
-import { recordTruckView } from "@/lib/trackView";
-import ProfileGallery from "@/components/truck/ProfileGallery";
+import { recordTruckView, type ViewSource } from "@/lib/trackView";
+import GalleryWithTracking from "@/components/truck/GalleryWithTracking";
 import TruckProfileSections, { type ProfileStatus } from "@/components/truck/TruckProfileSections";
 import type { DiscoverEntry } from "./types";
 
@@ -20,6 +20,8 @@ interface DetailSheetProps {
   favorited: boolean;
   isOwnerView: boolean;
   reviewsRequireLogin?: boolean;
+  /** Where this selection came from -- map pin or list/browse card. */
+  source?: ViewSource;
   onClose: () => void;
 }
 
@@ -30,6 +32,7 @@ export default function DetailSheet({
   favorited,
   isOwnerView,
   reviewsRequireLogin = false,
+  source = "list",
   onClose,
 }: DetailSheetProps) {
   const { truck, status, schedules, rating, events, dayPlan } = entry;
@@ -100,7 +103,8 @@ export default function DetailSheet({
   }, [onClose]);
 
   useEffect(() => {
-    recordTruckView(truck.id, isOwnerView);
+    recordTruckView(truck.id, isOwnerView, source);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [truck.id, isOwnerView]);
 
   // Lazy-load the gallery only for the truck currently open in the sheet.
@@ -137,7 +141,9 @@ export default function DetailSheet({
         aria-label={truck.name}
         className="sheet-in absolute inset-y-0 right-0 flex w-full max-w-[460px] flex-col bg-paper shadow-2xl"
       >
-        <ProfileGallery
+        <GalleryWithTracking
+          truckId={truck.id}
+          isOwnerView={isOwnerView}
           images={galleryImages}
           name={truck.name}
           variant="sheet"

@@ -22,6 +22,8 @@ import { dateStr } from "@/lib/events";
 import { formatEventDateRange, formatEventTime } from "@/lib/eventFormat";
 import { LangProvider, useLang, weekdayName, type Lang } from "@/lib/i18n";
 import { CITY_LIST, DEFAULT_MAP_CENTER, CITIES } from "@/lib/cities";
+import { recordCuisineSearch } from "@/lib/trackVisit";
+import type { ViewSource } from "@/lib/trackView";
 import DiscoverHeader from "./DiscoverHeader";
 import DaySelector from "./DaySelector";
 import TruckCard from "./TruckCard";
@@ -105,6 +107,9 @@ function DiscoverClientInner({
 
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Where the current selection came from -- surfaced to owners as "views by
+  // source" in their Insights panel.
+  const [selectedSource, setSelectedSource] = useState<ViewSource>("list");
   const [mobileView, setMobileView] = useState<"map" | "list">("list");
 
   const cardRefs = useRef<Map<string, HTMLDivElement>>(new Map());
@@ -115,6 +120,12 @@ function DiscoverClientInner({
   const selectFromBrowse = (id: string) => {
     skipCardScrollRef.current = true;
     setSelectedId(id);
+    setSelectedSource("list");
+  };
+
+  const selectFromMap = (id: string | null) => {
+    setSelectedId(id);
+    setSelectedSource("map");
   };
 
   useEffect(() => {
@@ -350,8 +361,12 @@ function DiscoverClientInner({
                   onClick={() =>
                     setCuisines((prev) => {
                       const next = new Set(prev);
-                      if (next.has(chip)) next.delete(chip);
-                      else next.add(chip);
+                      if (next.has(chip)) {
+                        next.delete(chip);
+                      } else {
+                        next.add(chip);
+                        recordCuisineSearch(chip);
+                      }
                       return next;
                     })
                   }
@@ -450,7 +465,10 @@ function DiscoverClientInner({
                       selected={selectedId === k}
                       distanceKm={userLocation ? dist : null}
                       isOwnerView={ownedTruckIds.has(entry.truck.id)}
-                      onSelect={() => setSelectedId(k)}
+                      onSelect={() => {
+                        setSelectedId(k);
+                        setSelectedSource("list");
+                      }}
                       onHover={(h) => setHoveredId(h ? k : null)}
                       ref={(el) => {
                         if (el) cardRefs.current.set(k, el);
@@ -477,7 +495,7 @@ function DiscoverClientInner({
               selectedId={selectedId}
               boostedCount={boostedCount}
               onHover={setHoveredId}
-              onSelect={setSelectedId}
+              onSelect={selectFromMap}
               onSelectEvent={(id) => router.push(`/events/${id}`)}
               onRequestLocation={requestLocation}
             />
@@ -531,6 +549,7 @@ function DiscoverClientInner({
           favorited={favoritedSet.has(selectedEntry.truck.id)}
           isOwnerView={ownedTruckIds.has(selectedEntry.truck.id)}
           reviewsRequireLogin={reviewsRequireLogin}
+          source={selectedSource}
           onClose={() => setSelectedId(null)}
         />
       )}

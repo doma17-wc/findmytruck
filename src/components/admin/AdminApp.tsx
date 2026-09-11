@@ -4,12 +4,13 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Truck, AdminEvent } from "@/lib/types";
 import { logoutAction } from "@/app/admin/actions";
-import { cn, Card, Badge } from "./ui";
+import { cn, Card, Badge, Stat } from "./ui";
 import TrucksTab from "./TrucksTab";
 import ClaimsTab from "./ClaimsTab";
 import UsersTab from "./UsersTab";
 import AdminEventsTab from "./AdminEventsTab";
 import SettingsTab from "./SettingsTab";
+import AnalyticsTab from "./AnalyticsTab";
 
 export interface AdminTruck extends Truck {
   scans: number;
@@ -30,7 +31,17 @@ export interface AdminUser {
   trucks: { id: string; name: string; claim_status: string | null }[];
 }
 
-type Tab = "overview" | "trucks" | "claims" | "events" | "users" | "settings";
+export interface AdminAnalyticsData {
+  dailyVisits: { date: string; count: number }[];
+  viewEvents: { truck_id: string; date: string }[];
+  impressionEvents: { truck_id: string; date: string; count: number }[];
+  favoriteEvents: { date: string }[];
+  reviewEvents: { date: string }[];
+  cuisineEvents: { cuisine: string; date: string; count: number }[];
+  ownerActivity: { truck_id: string | null; last_seen_at: string }[];
+}
+
+type Tab = "overview" | "trucks" | "claims" | "events" | "users" | "analytics" | "settings";
 
 const TABS: { key: Tab; label: string }[] = [
   { key: "overview", label: "Overview" },
@@ -38,6 +49,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: "claims", label: "Claims" },
   { key: "events", label: "Events" },
   { key: "users", label: "Users" },
+  { key: "analytics", label: "Analytics" },
   { key: "settings", label: "Settings" },
 ];
 
@@ -47,12 +59,14 @@ export default function AdminApp({
   events,
   hasServiceRole,
   reviewsRequireLogin,
+  analytics,
 }: {
   trucks: AdminTruck[];
   users: AdminUser[] | null;
   events: AdminEvent[];
   hasServiceRole: boolean;
   reviewsRequireLogin: boolean;
+  analytics: AdminAnalyticsData;
 }) {
   const [tab, setTab] = useState<Tab>("overview");
 
@@ -191,37 +205,10 @@ export default function AdminApp({
           />
         )}
         {tab === "users" && <UsersTab users={users} hasServiceRole={hasServiceRole} />}
+        {tab === "analytics" && <AnalyticsTab data={analytics} trucks={trucks} users={users} />}
         {tab === "settings" && <SettingsTab reviewsRequireLogin={reviewsRequireLogin} />}
       </div>
     </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  sub,
-  tone = "neutral",
-}: {
-  label: string;
-  value: number | string;
-  sub?: string;
-  tone?: "neutral" | "green" | "amber" | "blue";
-}) {
-  const ring =
-    tone === "green"
-      ? "text-live"
-      : tone === "amber"
-      ? "text-amber"
-      : tone === "blue"
-      ? "text-blue"
-      : "text-ink";
-  return (
-    <Card className="p-4">
-      <div className={cn("font-display text-2xl font-extrabold", ring)}>{value}</div>
-      <div className="mt-0.5 text-xs font-semibold text-muted">{label}</div>
-      {sub && <div className="mt-1 text-[11px] text-muted">{sub}</div>}
-    </Card>
   );
 }
 
