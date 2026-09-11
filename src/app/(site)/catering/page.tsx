@@ -1,15 +1,26 @@
 import type { Metadata } from "next";
 import { ConciergeBell } from "lucide-react";
 import { getCateringTrucks } from "@/lib/data";
+import { OG_LOCALE_DEFAULTS } from "@/lib/seo";
 import CateringGrid from "@/components/catering/CateringGrid";
 
 export const dynamic = "force-dynamic";
 
+const TITLE = "Foodtruck Catering Schweiz – Foodtruck mieten";
+const DESCRIPTION =
+  "Foodtruck mieten für Firmenanlass, Hochzeit oder private Feier: Foodtrucks aus der ganzen Schweiz für dein Catering, direkter Kontakt ohne Buchungsgebühr oder Mittelsmann.";
+
 export const metadata: Metadata = {
-  title: "Food Truck Catering in Switzerland",
-  description:
-    "Book a food truck for your private party or company event — browse Swiss food trucks available for catering and contact them directly. No booking fees, no middleman.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "https://findmytruck.ch/catering" },
+  openGraph: {
+    ...OG_LOCALE_DEFAULTS,
+    title: TITLE,
+    description: DESCRIPTION,
+    url: "https://findmytruck.ch/catering",
+    type: "website",
+  },
 };
 
 export default async function CateringPage() {
@@ -18,7 +29,8 @@ export default async function CateringPage() {
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: "Food truck catering in Switzerland",
+    name: "Foodtruck Catering Schweiz",
+    inLanguage: "de-CH",
     itemListElement: trucks.map((t, i) => ({
       "@type": "ListItem",
       position: i + 1,
@@ -40,7 +52,7 @@ export default async function CateringPage() {
             Catering
           </h1>
           <p className="text-[15px] text-neutral-600">
-            Food trucks available for private &amp; corporate events — contact them directly
+            Foodtrucks für private &amp; geschäftliche Anlässe — direkter Kontakt, kein Mittelsmann
           </p>
         </div>
       </div>
@@ -48,7 +60,7 @@ export default async function CateringPage() {
       {trucks.length === 0 ? (
         <div className="mt-12 rounded-2xl border border-dashed border-neutral-200 py-16 text-center">
           <p className="text-4xl">🍽️</p>
-          <p className="mt-3 text-sm text-neutral-500">No trucks are offering catering right now.</p>
+          <p className="mt-3 text-sm text-neutral-500">Aktuell bietet kein Truck Catering an.</p>
         </div>
       ) : (
         <CateringGrid trucks={trucks} />

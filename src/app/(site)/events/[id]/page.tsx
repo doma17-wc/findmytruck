@@ -6,6 +6,7 @@ import { ArrowLeft, CalendarDays, Clock, Link2, MapPin } from "lucide-react";
 import { getEventById } from "@/lib/events";
 import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
 import { formatEventDateRange, formatEventTime } from "@/lib/eventFormat";
+import { OG_LOCALE_DEFAULTS } from "@/lib/seo";
 import EventTypeBadge from "@/components/shared/EventTypeBadge";
 import EventRsvpButton from "@/components/events/EventRsvpButton";
 
@@ -15,20 +16,28 @@ interface Props {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const event = await getEventById(params.id);
-  if (!event) return { title: "Event not found" };
+  if (!event) return { title: "Event nicht gefunden" };
   const date = formatEventDateRange(event.start_date, event.end_date, {
     day: "numeric",
     month: "long",
     year: "numeric",
   });
+  const title = `${event.name} – ${date}`;
+  const description =
+    event.description ??
+    `${event.name} in ${event.location_name}, ${date}. Sieh, welche Foodtrucks dabei sind.`;
   return {
-    title: `${event.name} — ${date}`,
-    description:
-      event.description ?? `${event.name} at ${event.location_name}, ${date}. See which food trucks are attending.`,
+    title,
+    description,
     alternates: { canonical: `https://findmytruck.ch/events/${event.id}` },
-    openGraph: event.image_url
-      ? { images: [{ url: event.image_url }], title: event.name }
-      : { title: event.name },
+    openGraph: {
+      ...OG_LOCALE_DEFAULTS,
+      title,
+      description,
+      url: `https://findmytruck.ch/events/${event.id}`,
+      type: "website",
+      ...(event.image_url && { images: [{ url: event.image_url }] }),
+    },
   };
 }
 
@@ -57,14 +66,38 @@ export default async function EventDetailPage({ params }: Props) {
   const time = formatEventTime(event.start_time, event.end_time);
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${event.location_lat},${event.location_lng}`;
 
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Event",
+    name: event.name,
+    inLanguage: "de-CH",
+    description: event.description ?? undefined,
+    image: event.image_url ?? undefined,
+    startDate: `${event.start_date}${event.start_time ? `T${event.start_time}` : ""}`,
+    endDate: `${event.end_date}${event.end_time ? `T${event.end_time}` : ""}`,
+    eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+    eventStatus: "https://schema.org/EventScheduled",
+    location: {
+      "@type": "Place",
+      name: event.location_name,
+      address: { "@type": "PostalAddress", addressCountry: "CH" },
+      geo: {
+        "@type": "GeoCoordinates",
+        latitude: event.location_lat,
+        longitude: event.location_lng,
+      },
+    },
+  };
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 pb-16">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <Link
         href="/events"
         className="inline-flex items-center gap-1.5 text-sm font-semibold text-neutral-500 transition hover:text-neutral-800"
       >
         <ArrowLeft className="h-4 w-4" />
-        All events
+        Alle Events
       </Link>
 
       <div className="mt-4 overflow-hidden rounded-3xl border border-neutral-100 bg-white shadow-card">
@@ -129,7 +162,7 @@ export default async function EventDetailPage({ params }: Props) {
                 className="inline-flex items-center gap-1.5 text-sm font-bold text-brand hover:underline"
               >
                 <Link2 className="h-4 w-4" />
-                More details
+                Mehr Infos
               </a>
             )}
           </div>
@@ -137,7 +170,7 @@ export default async function EventDetailPage({ params }: Props) {
           {event.trucks.length > 0 && (
             <div className="mt-6 border-t border-neutral-100 pt-5">
               <h2 className="text-sm font-bold uppercase tracking-wide text-neutral-500">
-                Trucks at this event
+                Trucks bei diesem Event
               </h2>
               <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {event.trucks.map((t) => (

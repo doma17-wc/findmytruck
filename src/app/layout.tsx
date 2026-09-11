@@ -29,15 +29,17 @@ const spaceMono = Space_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL("https://findmytruck.ch"),
   title: {
-    default: "FindMyTruck — Find food trucks near you in Zurich",
+    default: "FindMyTruck – Foodtrucks in der Schweiz finden | Live-Karte",
     template: "%s | FindMyTruck",
   },
   description:
-    "Discover food trucks in Zurich in real time. See where they're parked today, check schedules, menus, and get directions.",
+    "Foodtrucks in der ganzen Deutschschweiz auf einer Live-Karte: Sieh sofort, welche Trucks gerade offen sind und wo. Öffnungszeiten, Speisekarten, Events und Catering — Streetfood in deiner Nähe finden, ganz ohne Suchen.",
+  alternates: { canonical: "https://findmytruck.ch" },
   openGraph: {
     siteName: "FindMyTruck",
     type: "website",
-    locale: "en_CH",
+    locale: "de_CH",
+    alternateLocale: ["en_CH"],
   },
   twitter: {
     card: "summary_large_image",
@@ -51,7 +53,7 @@ export default function RootLayout({
 }) {
   return (
     <html
-      lang="en"
+      lang="de-CH"
       className={`${inter.variable} ${bricolage.variable} ${spaceMono.variable}`}
     >
       <body>

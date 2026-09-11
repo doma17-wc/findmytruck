@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { getAllActiveTrucks } from "@/lib/data";
 import { getAllUpcomingEvents } from "@/lib/events";
+import { ROUTABLE_CITY_SLUGS } from "@/lib/cities";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const [trucks, events] = await Promise.all([getAllActiveTrucks(), getAllUpcomingEvents()]);
@@ -19,18 +20,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
   }));
 
+  const cityEntries: MetadataRoute.Sitemap = ROUTABLE_CITY_SLUGS.map((slug) => ({
+    url: `https://findmytruck.ch/${slug}`,
+    lastModified: new Date(),
+    changeFrequency: "daily",
+    priority: slug === "zurich" ? 0.9 : 0.7,
+  }));
+
   return [
     {
       url: "https://findmytruck.ch",
       lastModified: new Date(),
       changeFrequency: "always",
       priority: 1,
-    },
-    {
-      url: "https://findmytruck.ch/zurich",
-      lastModified: new Date(),
-      changeFrequency: "daily",
-      priority: 0.9,
     },
     {
       url: "https://findmytruck.ch/events",
@@ -62,6 +64,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "yearly",
       priority: 0.3,
     },
+    ...cityEntries,
     ...truckEntries,
     ...eventEntries,
   ];

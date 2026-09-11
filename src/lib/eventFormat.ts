@@ -5,9 +5,9 @@ export function formatEventDateRange(
   end: string,
   opts: Intl.DateTimeFormatOptions = { weekday: "short", day: "numeric", month: "short" }
 ): string {
-  const s = new Date(`${start}T00:00:00`).toLocaleDateString("en", opts);
+  const s = new Date(`${start}T00:00:00`).toLocaleDateString("de-CH", opts);
   if (start === end) return s;
-  const e = new Date(`${end}T00:00:00`).toLocaleDateString("en", opts);
+  const e = new Date(`${end}T00:00:00`).toLocaleDateString("de-CH", opts);
   return `${s} – ${e}`;
 }
 

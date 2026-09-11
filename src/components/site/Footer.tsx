@@ -3,6 +3,7 @@ import InstagramIcon from "@/components/icons/InstagramIcon";
 import TikTokIcon from "@/components/icons/TikTokIcon";
 import CookieSettingsButton from "./CookieSettingsButton";
 import { COMPANY } from "@/lib/legalContent";
+import { ROUTABLE_CITY_SLUGS, getCity } from "@/lib/cities";
 
 const LINKS = [
   { href: "/about", label: "About" },
@@ -10,6 +11,11 @@ const LINKS = [
   { href: "/catering", label: "Catering" },
   { href: "/contact", label: "Contact" },
 ];
+
+const CITY_LINKS = ROUTABLE_CITY_SLUGS.map((slug) => ({
+  href: `/${slug}`,
+  label: getCity(slug)!.name,
+}));
 
 const LEGAL_LINKS = [
   { href: "/agb", label: "AGB" },
@@ -67,7 +73,20 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="mt-8 flex flex-col gap-3 border-t border-neutral-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-8 border-t border-neutral-100 pt-6">
+          <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
+            Foodtrucks in deiner Stadt
+          </p>
+          <nav className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-sm font-medium text-neutral-600">
+            {CITY_LINKS.map((link) => (
+              <Link key={link.href} href={link.href} className="transition hover:text-brand">
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+        </div>
+
+        <div className="mt-6 flex flex-col gap-3 border-t border-neutral-100 pt-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-neutral-400">© 2026 FindMyTruck. All rights reserved.</p>
           <nav className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-medium text-neutral-500">
             {LEGAL_LINKS.map((link) => (

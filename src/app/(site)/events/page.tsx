@@ -3,15 +3,26 @@ import { CalendarDays } from "lucide-react";
 import { getAllUpcomingEvents } from "@/lib/events";
 import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
 import { EVENT_TYPE_META, EVENT_TYPE_OPTIONS, normalizeEventType } from "@/lib/types";
+import { OG_LOCALE_DEFAULTS } from "@/lib/seo";
 import EventCard from "@/components/events/EventCard";
 
 export const dynamic = "force-dynamic";
 
+const TITLE = "Streetfood Festivals & Foodtruck Events Schweiz";
+const DESCRIPTION =
+  "Foodtruck-Events, Streetfood-Festivals und Märkte in der ganzen Schweiz — sieh, welche Foodtrucks wann und wo dabei sind, und melde dich direkt an.";
+
 export const metadata: Metadata = {
-  title: "Events — Food Trucks in Switzerland",
-  description:
-    "Upcoming food truck festivals, markets, and private events across Switzerland — see which trucks are attending and when.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: "https://findmytruck.ch/events" },
+  openGraph: {
+    ...OG_LOCALE_DEFAULTS,
+    title: TITLE,
+    description: DESCRIPTION,
+    url: "https://findmytruck.ch/events",
+    type: "website",
+  },
 };
 
 export default async function EventsPage() {
@@ -41,10 +52,10 @@ export default async function EventsPage() {
         </span>
         <div>
           <h1 className="text-2xl font-extrabold tracking-tight text-neutral-900 sm:text-3xl">
-            What&apos;s happening
+            Was läuft
           </h1>
           <p className="text-[15px] text-neutral-600">
-            Festivals, markets &amp; food-truck gatherings around Switzerland
+            Streetfood-Festivals, Märkte &amp; Foodtruck-Events in der ganzen Schweiz
           </p>
         </div>
       </div>
@@ -70,7 +81,7 @@ export default async function EventsPage() {
         <div className="mt-12 rounded-2xl border border-dashed border-neutral-200 py-16 text-center">
           <p className="text-4xl">🎪</p>
           <p className="mt-3 text-sm text-neutral-500">
-            No upcoming events right now. Check back soon!
+            Aktuell keine bevorstehenden Events. Schau bald wieder vorbei!
           </p>
         </div>
       ) : (

@@ -36,7 +36,7 @@ export default function CityBrowseClient({
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by name or cuisine…"
+          placeholder="Nach Name oder Küche suchen…"
           className="w-full text-[15px] text-neutral-900 placeholder:text-neutral-400 focus:outline-none"
         />
       </div>
@@ -95,7 +95,7 @@ export default function CityBrowseClient({
 
       {filtered.length === 0 && (
         <p className="mt-8 text-center text-sm text-neutral-500">
-          No trucks match &quot;{query}&quot;.
+          Keine Trucks für „{query}“ gefunden.
         </p>
       )}
     </div>

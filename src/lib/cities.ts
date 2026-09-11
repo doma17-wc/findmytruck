@@ -1,32 +1,46 @@
 /**
  * Swiss city registry. Drives the /<city> browse pages and any map defaults.
  *
- * Only cities with a corresponding page under src/app/(site)/<slug>/ are actually
- * routable today (currently just Zurich), but the geocoder and map logic are
- * Switzerland-wide, so adding a new city here + a thin page is all that's needed.
+ * Every city listed here can be given a routable page under
+ * src/app/(site)/<slug>/page.tsx (a thin wrapper around
+ * src/app/(site)/_city/CityPageView.tsx) — see ROUTABLE_CITY_SLUGS below for
+ * which ones currently are. Adding a new one is: register it here, mark its
+ * slug as routable, add the one-line page file.
  */
 export interface City {
   slug: string;
-  /** Display name, e.g. "Zurich" or "St. Gallen". */
+  /** Display name, German-first (matches our Deutschschweiz audience). */
   name: string;
   /** Map center as [lng, lat]. */
   center: [number, number];
 }
 
 export const CITIES: Record<string, City> = {
-  zurich: { slug: "zurich", name: "Zurich", center: [8.5417, 47.3769] },
+  zurich: { slug: "zurich", name: "Zürich", center: [8.5417, 47.3769] },
   zug: { slug: "zug", name: "Zug", center: [8.5154, 47.1662] },
-  lucerne: { slug: "lucerne", name: "Lucerne", center: [8.3093, 47.0502] },
+  luzern: { slug: "luzern", name: "Luzern", center: [8.3093, 47.0502] },
   bern: { slug: "bern", name: "Bern", center: [7.4474, 46.948] },
   basel: { slug: "basel", name: "Basel", center: [7.5886, 47.5596] },
   winterthur: { slug: "winterthur", name: "Winterthur", center: [8.7241, 47.5001] },
   "st-gallen": { slug: "st-gallen", name: "St. Gallen", center: [9.3767, 47.4245] },
   lausanne: { slug: "lausanne", name: "Lausanne", center: [6.6323, 46.5197] },
-  geneva: { slug: "geneva", name: "Geneva", center: [6.1432, 46.2044] },
+  geneva: { slug: "geneva", name: "Genf", center: [6.1432, 46.2044] },
 };
 
 /** Cities in display order for pickers / browse chips. */
 export const CITY_LIST: City[] = Object.values(CITIES);
+
+/** Slugs with a real page at src/app/(site)/<slug>/page.tsx — used to build the
+ *  sitemap and any "browse by city" navigation. Deutschschweiz first. */
+export const ROUTABLE_CITY_SLUGS: string[] = [
+  "zurich",
+  "bern",
+  "basel",
+  "luzern",
+  "zug",
+  "winterthur",
+  "st-gallen",
+];
 
 /** Geographic center of Switzerland ([lng, lat]) — used as the map's fallback. */
 export const SWITZERLAND_CENTER: [number, number] = [8.2275, 46.8182];

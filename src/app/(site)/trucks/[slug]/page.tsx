@@ -11,6 +11,7 @@ import { normalizeMenuItems } from "@/lib/menu";
 import { isUnclaimed } from "@/lib/unclaimed";
 import { computeTruckStatus, getMondayFirstDay, readBoost } from "@/lib/geo";
 import { getCurrentUserProfile, createClient } from "@/lib/supabase/server";
+import { OG_LOCALE_DEFAULTS } from "@/lib/seo";
 import FavoriteButton from "@/components/FavoriteButton";
 import ViewTracker from "@/components/shared/ViewTracker";
 import GalleryWithTracking from "@/components/truck/GalleryWithTracking";
@@ -28,23 +29,43 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const truck = await getTruckBySlug(params.slug);
   if (!truck) return {};
 
-  const title = `${truck.name} — Food Truck in Switzerland`;
+  // Best-effort city/region hint for local search ("Foodtruck <Stadt>") —
+  // prefer the truck's home region, else the city from its first known stop
+  // (a full street address like "Bahnhofstrasse 1, 8001 Zürich" — take the
+  // last comma-separated segment and drop any leading postal code).
+  let cityHint = truck.source_region ?? null;
+  if (!cityHint) {
+    const schedule = await getTruckSchedule(truck.id);
+    const locationName = schedule[0]?.location_name ?? null;
+    cityHint = locationName
+      ? locationName.split(",").pop()!.trim().replace(/^\d{4}\s+/, "")
+      : null;
+  }
+
+  const cuisine = truck.cuisine_type?.length ? truck.cuisine_type.join(", ") : null;
+  const title = `${truck.name} – Foodtruck`;
   const description =
     truck.description ??
-    `Find ${truck.name}'s schedule, menu, and location in Switzerland on FindMyTruck.`;
+    `${truck.name} ist ein Foodtruck${cuisine ? ` für ${cuisine}` : ""}${
+      cityHint ? ` in ${cityHint}` : " in der Schweiz"
+    }. Sieh auf FindMyTruck live, wann und wo er als Nächstes steht — inklusive Speisekarte und Öffnungszeiten.`;
   const images = truck.cover_photo_url ? [truck.cover_photo_url] : [];
+  // openGraph.title isn't run through the root layout's title template, so
+  // spell out the " | FindMyTruck" suffix here to match the <title> tag.
+  const ogTitle = `${title} | FindMyTruck`;
 
   return {
     title,
     description,
     openGraph: {
-      title,
+      ...OG_LOCALE_DEFAULTS,
+      title: ogTitle,
       description,
       images,
       type: "profile",
       url: `${SITE}/trucks/${truck.slug}`,
     },
-    twitter: { card: "summary_large_image", title, description, images },
+    twitter: { card: "summary_large_image", title: ogTitle, description, images },
     alternates: { canonical: `${SITE}/trucks/${truck.slug}` },
   };
 }
@@ -122,6 +143,7 @@ export default async function TruckProfilePage({ params }: PageProps) {
     "@context": "https://schema.org",
     "@type": "LocalBusiness",
     name: truck.name,
+    inLanguage: "de-CH",
     description: truck.description ?? undefined,
     image: truck.cover_photo_url ?? truck.logo_url ?? undefined,
     servesCuisine: truck.cuisine_type,

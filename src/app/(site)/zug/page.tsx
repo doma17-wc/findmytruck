@@ -5,7 +5,7 @@ import CityPageView from "../_city/CityPageView";
 
 export const revalidate = 300;
 
-const CITY_SLUG = "zurich";
+const CITY_SLUG = "zug";
 
 export const metadata: Metadata = buildCityMetadata(getCity(CITY_SLUG)!);
 
