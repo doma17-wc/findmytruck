@@ -164,29 +164,31 @@ export default async function TruckProfilePage({ params }: PageProps) {
       <ViewTracker truckId={truck.id} isOwnerView={isOwnerView} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      <ProfileGallery
-        images={galleryImages}
-        name={truck.name}
-        variant="page"
-        overlayTopLeft={
-          <Link
-            href="/"
-            aria-label="Back to map"
-            className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-ink shadow-md backdrop-blur-sm transition hover:bg-white"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-        }
-        overlayTopRight={
-          <FavoriteButton
-            truckId={truck.id}
-            initialFavorited={isFavorited}
-            signedIn={Boolean(auth)}
-          />
-        }
-      />
+      <div className="lg:mx-auto lg:max-w-[1180px] lg:px-8 lg:pt-8">
+        <ProfileGallery
+          images={galleryImages}
+          name={truck.name}
+          variant="page"
+          overlayTopLeft={
+            <Link
+              href="/"
+              aria-label="Back to map"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-white/90 text-ink shadow-md backdrop-blur-sm transition hover:bg-white"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Link>
+          }
+          overlayTopRight={
+            <FavoriteButton
+              truckId={truck.id}
+              initialFavorited={isFavorited}
+              signedIn={Boolean(auth)}
+            />
+          }
+        />
+      </div>
 
-      <div className="mx-auto -mt-6 max-w-2xl rounded-t-3xl bg-paper px-4 pt-6 sm:px-6">
+      <div className="mx-auto -mt-6 max-w-2xl rounded-t-3xl bg-paper px-4 pt-6 sm:px-6 lg:mt-0 lg:max-w-[1180px] lg:rounded-none lg:px-8 lg:pt-10">
         <TruckProfileSections
           truck={truck}
           menuItems={menuItems}

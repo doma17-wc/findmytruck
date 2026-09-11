@@ -70,9 +70,15 @@ export default function TruckProfileSections({
   const compact = variant === "sheet";
 
   return (
-    <div className={compact ? "space-y-5" : "space-y-7"}>
+    <div
+      className={
+        compact
+          ? "space-y-5"
+          : "space-y-7 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-x-10 lg:gap-y-7 lg:space-y-0"
+      }
+    >
       {/* Identity */}
-      <div>
+      <div className="lg:col-start-1">
         <div className="flex flex-wrap items-center gap-2">
           {!unclaimed && (
             <ProfileStatusPill tier={status.boosted ? "boosted" : status.tier} label={status.headline} />
@@ -121,38 +127,39 @@ export default function TruckProfileSections({
         )}
       </div>
 
-      {/* Quick actions */}
-      <QuickActions
-        truckId={truck.id}
-        favorited={favorited}
-        signedIn={signedIn}
-        isOwnerView={isOwnerView}
-        directionsUrl={directionsUrl}
-        shareUrl={shareUrl}
-        shareTitle={truck.name}
-        instagram={truck.instagram}
-        tiktok={truck.tiktok}
-        website={websiteUrl}
-        phone={truck.phone}
-        email={truck.email}
-        truckName={truck.name}
-      />
+      {/* Quick actions + where-are-they: sticky sidebar on desktop */}
+      <div className="space-y-7 lg:sticky lg:top-24 lg:col-start-2 lg:row-span-full lg:self-start">
+        <QuickActions
+          truckId={truck.id}
+          favorited={favorited}
+          signedIn={signedIn}
+          isOwnerView={isOwnerView}
+          directionsUrl={directionsUrl}
+          shareUrl={shareUrl}
+          shareTitle={truck.name}
+          instagram={truck.instagram}
+          tiktok={truck.tiktok}
+          website={websiteUrl}
+          phone={truck.phone}
+          email={truck.email}
+          truckName={truck.name}
+        />
 
-      {/* Where are they */}
-      <StatusCard
-        tier={status.tier}
-        headline={status.headline}
-        boosted={status.boosted}
-        sub={status.sub}
-        next={status.next}
-        locationName={status.locationName}
-        locationNote={status.locationNote}
-        directionsUrl={directionsUrl}
-      />
+        <StatusCard
+          tier={status.tier}
+          headline={status.headline}
+          boosted={status.boosted}
+          sub={status.sub}
+          next={status.next}
+          locationName={status.locationName}
+          locationNote={status.locationNote}
+          directionsUrl={directionsUrl}
+        />
+      </div>
 
       {/* Menu */}
       {menuItems.length > 0 && (
-        <section>
+        <section className="lg:col-start-1">
           <SectionHeading>Menu</SectionHeading>
           <MenuBoard items={menuItems} />
         </section>
@@ -160,7 +167,7 @@ export default function TruckProfileSections({
 
       {/* Weekly tour */}
       {schedules.some((s) => s.specific_date == null && s.start_time !== s.end_time) && (
-        <section>
+        <section className="lg:col-start-1">
           <SectionHeading>Weekly tour</SectionHeading>
           <WeeklyTour
             schedules={schedules}
@@ -173,7 +180,7 @@ export default function TruckProfileSections({
 
       {/* Upcoming events */}
       {events.length > 0 && (
-        <section>
+        <section className="lg:col-start-1">
           <SectionHeading>Upcoming events</SectionHeading>
           {compact ? (
             <div className="mt-2 space-y-2.5">
@@ -192,11 +199,13 @@ export default function TruckProfileSections({
       )}
 
       {/* Catering */}
-      <CateringSection truck={truck} />
+      <div className="lg:col-start-1">
+        <CateringSection truck={truck} />
+      </div>
 
       {/* Claim CTA */}
       {unclaimed && (
-        <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4">
+        <div className="rounded-2xl border border-brand-200 bg-brand-50 p-4 lg:col-start-1">
           <p className="text-sm font-bold text-ink">Is this your truck?</p>
           <p className="mt-1 text-[13px] text-ink-soft">
             This profile was built from public sources. Claim it to add your real schedule, menu, and
@@ -213,7 +222,7 @@ export default function TruckProfileSections({
       )}
 
       {/* Reviews */}
-      <div id="reviews" className="scroll-mt-24">
+      <div id="reviews" className="scroll-mt-24 lg:col-start-1">
         <ReviewsSection
           truckId={truck.id}
           truckName={truck.name}

@@ -32,11 +32,14 @@ export default function ProfileGallery({
 
   const heightClass =
     variant === "page"
-      ? "h-[54vh] min-h-[300px] max-h-[560px] sm:h-[64vh] sm:max-h-[640px]"
+      ? "h-[54vh] min-h-[300px] max-h-[560px] sm:h-[64vh] sm:max-h-[640px] lg:h-[420px] lg:max-h-[420px]"
       : "h-72 sm:h-80";
-  const sizes = variant === "page" ? "100vw" : "(max-width: 640px) 100vw, 460px";
-  // The full page lifts a rounded panel ~20px over the hero — keep controls clear of it.
-  const controlsBottom = variant === "page" ? "bottom-7" : "bottom-3";
+  const roundedClass = variant === "page" ? "lg:rounded-3xl" : "";
+  const sizes =
+    variant === "page" ? "(min-width: 1024px) 1180px, 100vw" : "(max-width: 640px) 100vw, 460px";
+  // The full page lifts a rounded panel ~20px over the hero on mobile — keep controls clear of it.
+  // On desktop the hero is a standalone contained banner, so controls sit at the natural edge.
+  const controlsBottom = variant === "page" ? "bottom-7 lg:bottom-3" : "bottom-3";
 
   const onScroll = () => {
     const el = scrollRef.current;
@@ -112,7 +115,7 @@ export default function ProfileGallery({
   }, [lightbox, images.length]);
 
   return (
-    <div className={`group relative flex-shrink-0 overflow-hidden bg-paper-deep ${heightClass}`}>
+    <div className={`group relative flex-shrink-0 overflow-hidden bg-paper-deep ${heightClass} ${roundedClass}`}>
       {images.length > 0 ? (
         <div
           ref={scrollRef}
