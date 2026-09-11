@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, MapPin } from "lucide-react";
 import type { AdminEvent, EventTruckStatus } from "@/lib/types";
 import {
@@ -153,6 +153,24 @@ export default function AdminEventsTab({
     setShowForm(false);
   };
 
+  // The form renders as a modal overlay (see below) rather than inline in the
+  // page flow -- with a long, filtered event grid, an inline form opened by a
+  // card far down the page would render off-screen above the fold and look
+  // like the Edit button did nothing. Esc closes it, matching the modal feel.
+  useEffect(() => {
+    if (!showForm) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setEditingId(null);
+        setDraft(emptyDraft);
+        setError(null);
+        setShowForm(false);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showForm]);
+
   const toggleTruck = (id: string) =>
     setDraft((d) => ({
       ...d,
@@ -244,242 +262,255 @@ export default function AdminEventsTab({
       </div>
 
       {showForm && (
-        <Card className="p-4">
-          <h3 className="font-display text-sm font-bold text-ink">
-            {editingId ? "Edit event" : "New event (e.g. a general festival with many trucks)"}
-          </h3>
-          <div className="mt-3 space-y-3">
-            <EventImageDropzone
-              value={draft.image_url}
-              onChange={(image_url) => setDraft((d) => ({ ...d, image_url }))}
-            />
-            <input
-              value={draft.name}
-              onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-              placeholder="Event name"
-              className={inputClass}
-            />
-            <select
-              value={draft.event_type}
-              onChange={(e) =>
-                setDraft((d) => ({ ...d, event_type: e.target.value as EventType }))
-              }
-              className={inputClass}
-            >
-              {EVENT_TYPE_OPTIONS.map((t) => (
-                <option key={t} value={t}>
-                  {EVENT_TYPE_META[t].emoji} {EVENT_TYPE_META[t].label}
-                </option>
-              ))}
-            </select>
-            <textarea
-              value={draft.description}
-              onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
-              placeholder="Description (optional)"
-              rows={3}
-              className={`${inputClass} resize-none`}
-            />
-
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-neutral-500">Start date</span>
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 py-8"
+          onClick={cancel}
+        >
+          <div className="w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <Card className="p-4">
+              <h3 className="font-display text-sm font-bold text-ink">
+                {editingId ? "Edit event" : "New event (e.g. a general festival with many trucks)"}
+              </h3>
+              <div className="mt-3 space-y-3">
+                <EventImageDropzone
+                  value={draft.image_url}
+                  onChange={(image_url) => setDraft((d) => ({ ...d, image_url }))}
+                />
                 <input
-                  type="date"
-                  value={draft.start_date}
+                  value={draft.name}
+                  onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+                  placeholder="Event name"
+                  className={inputClass}
+                />
+                <select
+                  value={draft.event_type}
                   onChange={(e) =>
-                    setDraft((d) => ({
-                      ...d,
-                      start_date: e.target.value,
-                      end_date: d.end_date && d.end_date >= e.target.value ? d.end_date : e.target.value,
-                    }))
+                    setDraft((d) => ({ ...d, event_type: e.target.value as EventType }))
                   }
                   className={inputClass}
+                >
+                  {EVENT_TYPE_OPTIONS.map((t) => (
+                    <option key={t} value={t}>
+                      {EVENT_TYPE_META[t].emoji} {EVENT_TYPE_META[t].label}
+                    </option>
+                  ))}
+                </select>
+                <textarea
+                  value={draft.description}
+                  onChange={(e) => setDraft((d) => ({ ...d, description: e.target.value }))}
+                  placeholder="Description (optional)"
+                  rows={3}
+                  className={`${inputClass} resize-none`}
                 />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-neutral-500">End date</span>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-neutral-500">Start date</span>
+                    <input
+                      type="date"
+                      value={draft.start_date}
+                      onChange={(e) =>
+                        setDraft((d) => ({
+                          ...d,
+                          start_date: e.target.value,
+                          end_date:
+                            d.end_date && d.end_date >= e.target.value ? d.end_date : e.target.value,
+                        }))
+                      }
+                      className={inputClass}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-neutral-500">End date</span>
+                    <input
+                      type="date"
+                      value={draft.end_date}
+                      min={draft.start_date || undefined}
+                      onChange={(e) => setDraft((d) => ({ ...d, end_date: e.target.value }))}
+                      className={inputClass}
+                    />
+                  </label>
+                </div>
+
+                <LocationSearch
+                  onSelect={(loc) =>
+                    setDraft((d) => ({
+                      ...d,
+                      location_name: loc.name,
+                      location_lat: loc.lat,
+                      location_lng: loc.lng,
+                    }))
+                  }
+                />
+                {draft.location_lat !== null && (
+                  <p className="text-xs text-neutral-500">Selected: {draft.location_name}</p>
+                )}
+
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-neutral-500">Start time</span>
+                    <TimePickerField
+                      value={draft.start_time}
+                      onChange={(start_time) => setDraft((d) => ({ ...d, start_time }))}
+                      ariaLabel="Start time"
+                      triggerClassName={`${inputClass} text-left`}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-1 block text-xs font-medium text-neutral-500">End time</span>
+                    <TimePickerField
+                      value={draft.end_time}
+                      onChange={(end_time) => setDraft((d) => ({ ...d, end_time }))}
+                      ariaLabel="End time"
+                      triggerClassName={`${inputClass} text-left`}
+                    />
+                  </label>
+                </div>
+
                 <input
-                  type="date"
-                  value={draft.end_date}
-                  min={draft.start_date || undefined}
-                  onChange={(e) => setDraft((d) => ({ ...d, end_date: e.target.value }))}
+                  value={draft.link}
+                  onChange={(e) => setDraft((d) => ({ ...d, link: e.target.value }))}
+                  placeholder="Link (optional)"
                   className={inputClass}
                 />
-              </label>
-            </div>
 
-            <LocationSearch
-              onSelect={(loc) =>
-                setDraft((d) => ({ ...d, location_name: loc.name, location_lat: loc.lat, location_lng: loc.lng }))
-              }
-            />
-            {draft.location_lat !== null && (
-              <p className="text-xs text-neutral-500">Selected: {draft.location_name}</p>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-neutral-500">Start time</span>
-                <TimePickerField
-                  value={draft.start_time}
-                  onChange={(start_time) => setDraft((d) => ({ ...d, start_time }))}
-                  ariaLabel="Start time"
-                  triggerClassName={`${inputClass} text-left`}
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-neutral-500">End time</span>
-                <TimePickerField
-                  value={draft.end_time}
-                  onChange={(end_time) => setDraft((d) => ({ ...d, end_time }))}
-                  ariaLabel="End time"
-                  triggerClassName={`${inputClass} text-left`}
-                />
-              </label>
-            </div>
-
-            <input
-              value={draft.link}
-              onChange={(e) => setDraft((d) => ({ ...d, link: e.target.value }))}
-              placeholder="Link (optional)"
-              className={inputClass}
-            />
-
-            {!editingId ? (
-              <div>
-                <span className="mb-1 block text-xs font-medium text-neutral-500">
-                  Trucks attending ({draft.truckIds.length} selected)
-                </span>
-                <input
-                  value={truckFilter}
-                  onChange={(e) => setTruckFilter(e.target.value)}
-                  placeholder="Filter trucks…"
-                  className={`${inputClass} mb-2`}
-                />
-                <div className="max-h-56 overflow-y-auto rounded-xl border border-neutral-200">
-                  {filteredTrucks.map((t) => (
-                    <label
-                      key={t.id}
-                      className="flex items-center gap-2 border-b border-neutral-100 px-3 py-2 text-sm last:border-b-0"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={draft.truckIds.includes(t.id)}
-                        onChange={() => toggleTruck(t.id)}
-                      />
-                      {t.name}
-                    </label>
-                  ))}
-                  {filteredTrucks.length === 0 && (
-                    <div className="px-3 py-2 text-sm text-neutral-400">No trucks match</div>
-                  )}
-                </div>
-              </div>
-            ) : (
-              <div>
-                <span className="mb-1 block text-xs font-medium text-neutral-500">
-                  Trucks attending — invite, confirm or remove
-                </span>
-                <div className="space-y-1.5 rounded-xl border border-neutral-200 p-2">
-                  {(editingEvent?.truckLinks ?? []).length === 0 && (
-                    <p className="px-2 py-1.5 text-sm text-neutral-400">No trucks linked yet</p>
-                  )}
-                  {(editingEvent?.truckLinks ?? []).map((link) => {
-                    const truck = truckById.get(link.truck_id);
-                    return (
-                      <div
-                        key={link.truck_id}
-                        className="flex flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm"
+                {!editingId ? (
+                  <div>
+                    <span className="mb-1 block text-xs font-medium text-neutral-500">
+                      Trucks attending ({draft.truckIds.length} selected)
+                    </span>
+                    <input
+                      value={truckFilter}
+                      onChange={(e) => setTruckFilter(e.target.value)}
+                      placeholder="Filter trucks…"
+                      className={`${inputClass} mb-2`}
+                    />
+                    <div className="max-h-56 overflow-y-auto rounded-xl border border-neutral-200">
+                      {filteredTrucks.map((t) => (
+                        <label
+                          key={t.id}
+                          className="flex items-center gap-2 border-b border-neutral-100 px-3 py-2 text-sm last:border-b-0"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={draft.truckIds.includes(t.id)}
+                            onChange={() => toggleTruck(t.id)}
+                          />
+                          {t.name}
+                        </label>
+                      ))}
+                      {filteredTrucks.length === 0 && (
+                        <div className="px-3 py-2 text-sm text-neutral-400">No trucks match</div>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <span className="mb-1 block text-xs font-medium text-neutral-500">
+                      Trucks attending — invite, confirm or remove
+                    </span>
+                    <div className="space-y-1.5 rounded-xl border border-neutral-200 p-2">
+                      {(editingEvent?.truckLinks ?? []).length === 0 && (
+                        <p className="px-2 py-1.5 text-sm text-neutral-400">No trucks linked yet</p>
+                      )}
+                      {(editingEvent?.truckLinks ?? []).map((link) => {
+                        const truck = truckById.get(link.truck_id);
+                        return (
+                          <div
+                            key={link.truck_id}
+                            className="flex flex-wrap items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-sm"
+                          >
+                            <span className="min-w-0 flex-1 truncate font-medium text-ink">
+                              {truck?.name ?? "Unknown truck"}
+                            </span>
+                            <div className="flex flex-shrink-0 items-center gap-1.5">
+                              <select
+                                defaultValue={link.status}
+                                onChange={(e) =>
+                                  setEventTruckStatusAction(
+                                    editingId,
+                                    link.truck_id,
+                                    e.target.value as EventTruckStatus
+                                  )
+                                }
+                                className="rounded-lg border border-neutral-200 bg-white px-2 py-1 text-xs font-bold text-neutral-600 outline-none focus:border-accent"
+                              >
+                                <option value="invited">Invited</option>
+                                <option value="confirmed">Confirmed</option>
+                                <option value="declined">Declined</option>
+                              </select>
+                              <ActionButton
+                                onRun={() => removeEventTruckAction(editingId, link.truck_id)}
+                                confirm={`Remove ${truck?.name ?? "this truck"} from the event?`}
+                                className="bg-accent/10 text-accent-dark hover:bg-accent/20"
+                              >
+                                Remove
+                              </ActionButton>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <select
+                        value={addTruckId}
+                        onChange={(e) => setAddTruckId(e.target.value)}
+                        className={`${inputClass} flex-1`}
                       >
-                        <span className="min-w-0 flex-1 truncate font-medium text-ink">
-                          {truck?.name ?? "Unknown truck"}
-                        </span>
-                        <div className="flex flex-shrink-0 items-center gap-1.5">
-                          <select
-                            defaultValue={link.status}
-                            onChange={(e) =>
-                              setEventTruckStatusAction(
-                                editingId,
-                                link.truck_id,
-                                e.target.value as EventTruckStatus
-                              )
-                            }
-                            className="rounded-lg border border-neutral-200 bg-white px-2 py-1 text-xs font-bold text-neutral-600 outline-none focus:border-accent"
-                          >
-                            <option value="invited">Invited</option>
-                            <option value="confirmed">Confirmed</option>
-                            <option value="declined">Declined</option>
-                          </select>
-                          <ActionButton
-                            onRun={() => removeEventTruckAction(editingId, link.truck_id)}
-                            confirm={`Remove ${truck?.name ?? "this truck"} from the event?`}
-                            className="bg-accent/10 text-accent-dark hover:bg-accent/20"
-                          >
-                            Remove
-                          </ActionButton>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <select
-                    value={addTruckId}
-                    onChange={(e) => setAddTruckId(e.target.value)}
-                    className={`${inputClass} flex-1`}
-                  >
-                    <option value="">Add a truck…</option>
-                    {addableTrucks.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
+                        <option value="">Add a truck…</option>
+                        {addableTrucks.map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        type="button"
+                        disabled={!addTruckId}
+                        onClick={() => {
+                          const id = addTruckId;
+                          setAddTruckId("");
+                          void setEventTruckStatusAction(editingId, id, "confirmed");
+                        }}
+                        className="rounded-xl bg-live/10 px-3 py-2.5 text-xs font-bold text-live disabled:opacity-40"
+                      >
+                        Add confirmed
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!addTruckId}
+                        onClick={() => {
+                          const id = addTruckId;
+                          setAddTruckId("");
+                          void setEventTruckStatusAction(editingId, id, "invited");
+                        }}
+                        className="rounded-xl bg-amber/10 px-3 py-2.5 text-xs font-bold text-amber disabled:opacity-40"
+                      >
+                        Invite
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {error && <p className="text-xs font-semibold text-red-500">{error}</p>}
+
+                <div className="flex items-center gap-3">
                   <button
                     type="button"
-                    disabled={!addTruckId}
-                    onClick={() => {
-                      const id = addTruckId;
-                      setAddTruckId("");
-                      void setEventTruckStatusAction(editingId, id, "confirmed");
-                    }}
-                    className="rounded-xl bg-live/10 px-3 py-2.5 text-xs font-bold text-live disabled:opacity-40"
+                    onClick={handleSave}
+                    disabled={submitting}
+                    className="rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60"
                   >
-                    Add confirmed
+                    {submitting ? "Saving…" : editingId ? "Save changes" : "Add event"}
                   </button>
-                  <button
-                    type="button"
-                    disabled={!addTruckId}
-                    onClick={() => {
-                      const id = addTruckId;
-                      setAddTruckId("");
-                      void setEventTruckStatusAction(editingId, id, "invited");
-                    }}
-                    className="rounded-xl bg-amber/10 px-3 py-2.5 text-xs font-bold text-amber disabled:opacity-40"
-                  >
-                    Invite
+                  <button type="button" onClick={cancel} className="text-sm font-semibold text-neutral-500">
+                    Cancel
                   </button>
                 </div>
               </div>
-            )}
-
-            {error && <p className="text-xs font-semibold text-red-500">{error}</p>}
-
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleSave}
-                disabled={submitting}
-                className="rounded-xl bg-accent px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60"
-              >
-                {submitting ? "Saving…" : editingId ? "Save changes" : "Add event"}
-              </button>
-              <button type="button" onClick={cancel} className="text-sm font-semibold text-neutral-500">
-                Cancel
-              </button>
-            </div>
+            </Card>
           </div>
-        </Card>
+        </div>
       )}
 
       {visibleEvents.length === 0 ? (
