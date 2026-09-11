@@ -1,14 +1,22 @@
 import type { MetadataRoute } from "next";
 import { getAllActiveTrucks } from "@/lib/data";
+import { getAllUpcomingEvents } from "@/lib/events";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const trucks = await getAllActiveTrucks();
+  const [trucks, events] = await Promise.all([getAllActiveTrucks(), getAllUpcomingEvents()]);
 
   const truckEntries: MetadataRoute.Sitemap = trucks.map((truck) => ({
     url: `https://findmytruck.ch/trucks/${truck.slug}`,
     lastModified: truck.updated_at,
     changeFrequency: "daily",
     priority: 0.8,
+  }));
+
+  const eventEntries: MetadataRoute.Sitemap = events.map((event) => ({
+    url: `https://findmytruck.ch/events/${event.id}`,
+    lastModified: event.created_at,
+    changeFrequency: "weekly",
+    priority: 0.6,
   }));
 
   return [
@@ -55,5 +63,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.3,
     },
     ...truckEntries,
+    ...eventEntries,
   ];
 }

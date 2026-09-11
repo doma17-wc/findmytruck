@@ -7,8 +7,19 @@ import { supabase } from "@/lib/supabase";
 import { getServiceSupabase } from "@/lib/supabase/admin";
 import { normalizeMenuItems } from "@/lib/menu";
 import { setAppSetting } from "@/lib/settings";
-import { ADMIN_COOKIE, hashAdminPassword } from "@/lib/adminAuth";
+import { ADMIN_COOKIE, hashAdminPassword, isValidAdminToken } from "@/lib/adminAuth";
 import type { EventTruckStatus } from "@/lib/types";
+
+// Server Actions are callable directly (by action reference) regardless of
+// which page/path they were invoked from -- the middleware's `pathname
+// .startsWith("/admin")` check never runs for a direct action POST. Every
+// mutating action below must therefore re-check the admin cookie itself.
+async function requireAdmin(): Promise<void> {
+  const token = cookies().get(ADMIN_COOKIE)?.value;
+  if (!(await isValidAdminToken(token))) {
+    throw new Error("Not authorized.");
+  }
+}
 
 // ---------- Auth ----------
 
@@ -63,6 +74,7 @@ export async function saveTruckAction(
   _prevState: TruckFormState,
   formData: FormData
 ): Promise<TruckFormState> {
+  await requireAdmin();
   const name = String(formData.get("name") ?? "").trim();
   if (!name) return { error: "Name is required." };
 
@@ -172,6 +184,7 @@ export async function saveTruckAction(
 }
 
 export async function saveTruckMenuAction(truckId: string, items: unknown) {
+  await requireAdmin();
   const service = getServiceSupabase();
   if (!service) return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to manage trucks." };
 
@@ -187,6 +200,7 @@ export async function saveTruckMenuAction(truckId: string, items: unknown) {
 }
 
 export async function deleteTruckAction(truckId: string) {
+  await requireAdmin();
   const service = getServiceSupabase();
   if (!service) return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to manage trucks." };
 
@@ -200,6 +214,7 @@ export async function deleteTruckAction(truckId: string) {
 }
 
 export async function pauseTruckAction(truckId: string, paused: boolean) {
+  await requireAdmin();
   const service = getServiceSupabase();
   if (!service) return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to manage trucks." };
 
@@ -210,6 +225,7 @@ export async function pauseTruckAction(truckId: string, paused: boolean) {
 }
 
 export async function setBoostOverrideAction(truckId: string, on: boolean) {
+  await requireAdmin();
   const service = getServiceSupabase();
   if (!service) return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to manage trucks." };
 
@@ -236,6 +252,7 @@ export async function setBoostOverrideAction(truckId: string, on: boolean) {
 
 /** Toggle "only logged-in customers can leave reviews" (migration 0013). */
 export async function setReviewsRequireLoginAction(on: boolean) {
+  await requireAdmin();
   const res = await setAppSetting("reviews_require_login", on);
   if (res.error) return { error: res.error };
   revalidatePublic();
@@ -247,6 +264,7 @@ export async function setReviewsRequireLoginAction(on: boolean) {
 
 /** Approve a pending claim: mark the profile fully claimed + verified. */
 export async function approveClaimAction(truckId: string) {
+  await requireAdmin();
   const service = getServiceSupabase();
   if (!service) return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to manage trucks." };
 
@@ -263,6 +281,7 @@ export async function setClaimStatusAction(
   truckId: string,
   status: "unclaimed" | "pending" | "claimed"
 ) {
+  await requireAdmin();
   const service = getServiceSupabase();
   if (!service) return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to manage trucks." };
 
@@ -277,6 +296,7 @@ export async function setClaimStatusAction(
 
 /** Link a truck-owner account (by email) to a truck. Needs the service key. */
 export async function assignOwnerByEmailAction(truckId: string, email: string) {
+  await requireAdmin();
   const service = getServiceSupabase();
   if (!service) {
     return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to manage owner accounts." };
@@ -291,6 +311,7 @@ export async function assignOwnerByEmailAction(truckId: string, email: string) {
 }
 
 export async function unassignOwnerAction(truckId: string) {
+  await requireAdmin();
   const service = getServiceSupabase();
   if (!service) {
     return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to manage owner accounts." };
@@ -304,6 +325,7 @@ export async function unassignOwnerAction(truckId: string) {
 /** Unassign ONE truck from ONE owner, leaving that owner's other trucks (and any
  *  other owners of this truck) untouched. Migration 0014. */
 export async function adminUnlinkOneTruckAction(userId: string, truckId: string) {
+  await requireAdmin();
   const service = getServiceSupabase();
   if (!service) {
     return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to manage owner accounts." };
@@ -321,6 +343,7 @@ export async function adminUnlinkOneTruckAction(userId: string, truckId: string)
 // ---------- Users ----------
 
 export async function deleteUserAction(userId: string) {
+  await requireAdmin();
   const service = getServiceSupabase();
   if (!service) {
     return { error: "Set SUPABASE_SERVICE_ROLE_KEY in the environment to delete user accounts." };
@@ -354,6 +377,7 @@ export async function saveScheduleAction(
   scheduleId: string | null,
   formData: FormData
 ) {
+  await requireAdmin();
   const frequencyRaw = String(formData.get("frequency") ?? "weekly");
   const frequency = ["weekly", "alternate", "monthly_weeks"].includes(frequencyRaw)
     ? frequencyRaw
@@ -389,6 +413,7 @@ export async function saveScheduleAction(
 }
 
 export async function deleteScheduleAction(truckId: string, scheduleId: string) {
+  await requireAdmin();
   await supabase.from("truck_schedules").delete().eq("id", scheduleId);
   revalidatePath(`/admin/trucks/${truckId}`);
   revalidatePublic();
@@ -421,6 +446,7 @@ export async function saveEventAction(
   eventId: string | null,
   formData: FormData
 ): Promise<EventFormResult> {
+  await requireAdmin();
   const service = getServiceSupabase();
   if (!service) return noServiceRole;
 
@@ -488,6 +514,7 @@ export async function setEventTruckStatusAction(
   truckId: string,
   status: EventTruckStatus
 ): Promise<EventFormResult> {
+  await requireAdmin();
   const service = getServiceSupabase();
   if (!service) return noServiceRole;
 
@@ -504,6 +531,7 @@ export async function removeEventTruckAction(
   eventId: string,
   truckId: string
 ): Promise<EventFormResult> {
+  await requireAdmin();
   const service = getServiceSupabase();
   if (!service) return noServiceRole;
 
@@ -521,6 +549,7 @@ export async function deleteEventAction(
   eventId: string,
   truckId?: string | null
 ): Promise<EventFormResult> {
+  await requireAdmin();
   const service = getServiceSupabase();
   if (!service) return noServiceRole;
 
@@ -552,6 +581,7 @@ async function syncCoverPhoto(truckId: string) {
 }
 
 export async function addPhotoAction(truckId: string, url: string, caption: string) {
+  await requireAdmin();
   const { count } = await supabase
     .from("truck_photos")
     .select("id", { count: "exact", head: true })
@@ -570,6 +600,7 @@ export async function addPhotoAction(truckId: string, url: string, caption: stri
 }
 
 export async function deletePhotoAction(truckId: string, photoId: string) {
+  await requireAdmin();
   await supabase.from("truck_photos").delete().eq("id", photoId);
   await syncCoverPhoto(truckId);
   revalidatePath(`/admin/trucks/${truckId}`);
@@ -577,6 +608,7 @@ export async function deletePhotoAction(truckId: string, photoId: string) {
 }
 
 export async function reorderPhotoAction(truckId: string, orderedIds: string[]) {
+  await requireAdmin();
   await Promise.all(
     orderedIds.map((id, index) =>
       supabase.from("truck_photos").update({ sort_order: index }).eq("id", id).eq("truck_id", truckId)
@@ -589,6 +621,7 @@ export async function reorderPhotoAction(truckId: string, orderedIds: string[]) 
 
 /** Move one photo to the front (sort_order 0) — used by "Set as cover". */
 export async function setCoverPhotoAction(truckId: string, photoId: string) {
+  await requireAdmin();
   const { data: rows } = await supabase
     .from("truck_photos")
     .select("id")
@@ -620,6 +653,7 @@ function randomShortCode(): string {
 }
 
 export async function generateQrCodeAction(truckId: string, slug: string) {
+  await requireAdmin();
   const shortCode = randomShortCode();
   const destinationUrl = `https://findmytruck.ch/trucks/${slug}`;
 

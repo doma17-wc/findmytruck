@@ -139,7 +139,7 @@ export async function signInAction(
   if (error) return { error: error.message };
 
   revalidatePath("/", "layout");
-  redirect(next.startsWith("/") ? next : "/account");
+  redirect(next.startsWith("/") && !next.startsWith("//") ? next : "/account");
 }
 
 // ---------- Sign in: magic link ----------
